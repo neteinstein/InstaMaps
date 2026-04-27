@@ -1,4 +1,4 @@
-package com.neteinstein.instagramtogooglemaps.presentation
+package org.neteinstein.instamaps.presentation
 
 sealed class MainUiState {
     object Idle : MainUiState()

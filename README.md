@@ -1,7 +1,7 @@
 # InstaMaps
 
 ## Description
-InstagramToGoogleMaps is an Android application that integrates with Instagram to extract location data from your posts and visualize them on Google Maps. It helps users track and explore places they've visited based on their Instagram activity, providing a personalized map view of their adventures.
+InstaMaps is an Android application that integrates with Instagram to extract location data from your posts and visualize them on Google Maps. It helps users track and explore places they've visited based on their Instagram activity, providing a personalized map view of their adventures.
 
 ## Features
 - Fetch location-tagged posts from Instagram.
@@ -15,7 +15,7 @@ InstagramToGoogleMaps is an Android application that integrates with Instagram t
 - Google Maps API key (configure in the app settings).
 
 ## Installation
-1. Clone the repository: `git clone https://github.com/neteinstein/InstagramToGoogleMaps.git`
+1. Clone the repository: `git clone https://github.com/neteinstein/InstaMaps.git`
 2. Open the project in Android Studio.
 3. Build and run the app on an emulator or device using Gradle.
 

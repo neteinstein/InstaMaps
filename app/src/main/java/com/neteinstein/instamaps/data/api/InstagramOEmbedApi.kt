@@ -1,6 +1,6 @@
-package com.neteinstein.instagramtogooglemaps.data.api
+package org.neteinstein.instamaps.data.api
 
-import com.neteinstein.instagramtogooglemaps.data.api.model.OEmbedResponse
+import org.neteinstein.instamaps.data.api.model.OEmbedResponse
 import retrofit2.http.GET
 import retrofit2.http.Query
 

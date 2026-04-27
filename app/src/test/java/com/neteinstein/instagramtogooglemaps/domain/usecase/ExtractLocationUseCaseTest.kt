@@ -1,4 +1,4 @@
-package com.neteinstein.instagramtogooglemaps.domain.usecase
+package org.neteinstein.instamaps.domain.usecase
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull

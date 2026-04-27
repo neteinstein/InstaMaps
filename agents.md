@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-InstagramToGoogleMaps is an Android application that accepts shared Instagram reel URLs,
+InstaMaps is an Android application that accepts shared Instagram reel URLs,
 fetches the reel's description via the Instagram oEmbed API, extracts location information
 from the description, and allows users to open the location in Google Maps.
 

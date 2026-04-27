@@ -1,10 +1,10 @@
-package com.neteinstein.instagramtogooglemaps.presentation
+package org.neteinstein.instamaps.presentation
 
 import androidx.arch.core.executor.testing.InstantTaskExecutorRule
-import com.neteinstein.instagramtogooglemaps.domain.model.LocationInfo
-import com.neteinstein.instagramtogooglemaps.domain.model.ReelInfo
-import com.neteinstein.instagramtogooglemaps.domain.usecase.ExtractLocationUseCase
-import com.neteinstein.instagramtogooglemaps.domain.usecase.GetReelInfoUseCase
+import org.neteinstein.instamaps.domain.model.LocationInfo
+import org.neteinstein.instamaps.domain.model.ReelInfo
+import org.neteinstein.instamaps.domain.usecase.ExtractLocationUseCase
+import org.neteinstein.instamaps.domain.usecase.GetReelInfoUseCase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher

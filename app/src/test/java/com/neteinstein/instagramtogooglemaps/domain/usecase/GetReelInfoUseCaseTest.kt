@@ -1,7 +1,7 @@
-package com.neteinstein.instagramtogooglemaps.domain.usecase
+package org.neteinstein.instamaps.domain.usecase
 
-import com.neteinstein.instagramtogooglemaps.domain.model.ReelInfo
-import com.neteinstein.instagramtogooglemaps.domain.repository.LocationRepository
+import org.neteinstein.instamaps.domain.model.ReelInfo
+import org.neteinstein.instamaps.domain.repository.LocationRepository
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue

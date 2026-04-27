@@ -1,6 +1,6 @@
-package com.neteinstein.instagramtogooglemaps.data.network
+package org.neteinstein.instamaps.data.network
 
-import com.neteinstein.instagramtogooglemaps.data.api.InstagramOEmbedApi
+import org.neteinstein.instamaps.data.api.InstagramOEmbedApi
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit

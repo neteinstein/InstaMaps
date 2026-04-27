@@ -5,11 +5,11 @@ plugins {
 }
 
 android {
-    namespace 'com.neteinstein.instagramtogooglemaps'
+    namespace 'com.neteinstein.instamaps'
     compileSdk 34
 
     defaultConfig {
-        applicationId "com.neteinstein.instagramtogooglemaps"
+        applicationId "com.neteinstein.instamaps"
         minSdk 26
         targetSdk 34
         versionCode 1

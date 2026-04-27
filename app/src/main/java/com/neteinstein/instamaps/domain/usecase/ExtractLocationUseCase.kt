@@ -1,6 +1,6 @@
-package com.neteinstein.instagramtogooglemaps.domain.usecase
+package org.neteinstein.instamaps.domain.usecase
 
-import com.neteinstein.instagramtogooglemaps.domain.model.LocationInfo
+import org.neteinstein.instamaps.domain.model.LocationInfo
 
 class ExtractLocationUseCase {
     operator fun invoke(text: String): LocationInfo? {

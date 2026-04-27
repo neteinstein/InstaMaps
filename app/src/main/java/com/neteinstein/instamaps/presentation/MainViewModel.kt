@@ -1,11 +1,11 @@
-package com.neteinstein.instagramtogooglemaps.presentation
+package org.neteinstein.instamaps.presentation
 
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.neteinstein.instagramtogooglemaps.domain.usecase.ExtractLocationUseCase
-import com.neteinstein.instagramtogooglemaps.domain.usecase.GetReelInfoUseCase
+import org.neteinstein.instamaps.domain.usecase.ExtractLocationUseCase
+import org.neteinstein.instamaps.domain.usecase.GetReelInfoUseCase
 import kotlinx.coroutines.launch
 
 class MainViewModel(

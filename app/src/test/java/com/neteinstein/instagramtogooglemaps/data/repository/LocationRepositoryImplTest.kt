@@ -1,7 +1,7 @@
-package com.neteinstein.instagramtogooglemaps.data.repository
+package org.neteinstein.instamaps.data.repository
 
-import com.neteinstein.instagramtogooglemaps.data.api.InstagramOEmbedApi
-import com.neteinstein.instagramtogooglemaps.data.api.model.OEmbedResponse
+import org.neteinstein.instamaps.data.api.InstagramOEmbedApi
+import org.neteinstein.instamaps.data.api.model.OEmbedResponse
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue

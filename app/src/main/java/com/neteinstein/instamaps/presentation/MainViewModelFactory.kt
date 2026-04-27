@@ -1,11 +1,11 @@
-package com.neteinstein.instagramtogooglemaps.presentation
+package org.neteinstein.instamaps.presentation
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
-import com.neteinstein.instagramtogooglemaps.data.network.RetrofitFactory
-import com.neteinstein.instagramtogooglemaps.data.repository.LocationRepositoryImpl
-import com.neteinstein.instagramtogooglemaps.domain.usecase.ExtractLocationUseCase
-import com.neteinstein.instagramtogooglemaps.domain.usecase.GetReelInfoUseCase
+import org.neteinstein.instamaps.data.network.RetrofitFactory
+import org.neteinstein.instamaps.data.repository.LocationRepositoryImpl
+import org.neteinstein.instamaps.domain.usecase.ExtractLocationUseCase
+import org.neteinstein.instamaps.domain.usecase.GetReelInfoUseCase
 
 class MainViewModelFactory : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {

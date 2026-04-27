@@ -1,4 +1,4 @@
-package com.neteinstein.instagramtogooglemaps.data.api.model
+package org.neteinstein.instamaps.data.api.model
 
 import com.google.gson.annotations.SerializedName
 

@@ -1,4 +1,4 @@
-package com.neteinstein.instagramtogooglemaps.presentation
+package org.neteinstein.instamaps.presentation
 
 import android.content.Intent
 import android.net.Uri
@@ -7,8 +7,8 @@ import android.view.View
 import android.widget.Toast
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
-import com.neteinstein.instagramtogooglemaps.R
-import com.neteinstein.instagramtogooglemaps.databinding.ActivityMainBinding
+import org.neteinstein.instamaps.R
+import org.neteinstein.instamaps.databinding.ActivityMainBinding
 
 class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding

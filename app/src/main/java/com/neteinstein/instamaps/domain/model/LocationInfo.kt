@@ -1,4 +1,4 @@
-package com.neteinstein.instagramtogooglemaps.domain.model
+package org.neteinstein.instamaps.domain.model
 
 data class LocationInfo(
     val name: String,

@@ -1,8 +1,8 @@
-package com.neteinstein.instagramtogooglemaps.data.repository
+package org.neteinstein.instamaps.data.repository
 
-import com.neteinstein.instagramtogooglemaps.data.api.InstagramOEmbedApi
-import com.neteinstein.instagramtogooglemaps.domain.model.ReelInfo
-import com.neteinstein.instagramtogooglemaps.domain.repository.LocationRepository
+import org.neteinstein.instamaps.data.api.InstagramOEmbedApi
+import org.neteinstein.instamaps.domain.model.ReelInfo
+import org.neteinstein.instamaps.domain.repository.LocationRepository
 
 class LocationRepositoryImpl(
     private val api: InstagramOEmbedApi,
