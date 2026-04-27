@@ -12,7 +12,6 @@ class MainViewModel(
     private val getReelInfoUseCase: GetReelInfoUseCase,
     private val extractLocationUseCase: ExtractLocationUseCase,
 ) : ViewModel() {
-
     private val _uiState = MutableLiveData<MainUiState>(MainUiState.Idle)
     val uiState: LiveData<MainUiState> = _uiState
 
@@ -30,10 +29,11 @@ class MainViewModel(
                     }
                 },
                 onFailure = { error ->
-                    _uiState.value = MainUiState.Error(
-                        error.message ?: "Failed to fetch reel information"
-                    )
-                }
+                    _uiState.value =
+                        MainUiState.Error(
+                            error.message ?: "Failed to fetch reel information",
+                        )
+                },
             )
         }
     }

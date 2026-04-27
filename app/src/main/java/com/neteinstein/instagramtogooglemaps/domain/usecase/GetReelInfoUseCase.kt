@@ -13,7 +13,5 @@ class GetReelInfoUseCase(
         return repository.getReelInfo(url)
     }
 
-    private fun isValidInstagramUrl(url: String): Boolean {
-        return url.contains("instagram.com") || url.contains("instagr.am")
-    }
+    private fun isValidInstagramUrl(url: String): Boolean = url.contains("instagram.com") || url.contains("instagr.am")
 }

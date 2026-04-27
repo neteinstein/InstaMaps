@@ -11,7 +11,6 @@ import com.neteinstein.instagramtogooglemaps.R
 import com.neteinstein.instagramtogooglemaps.databinding.ActivityMainBinding
 
 class MainActivity : AppCompatActivity() {
-
     private lateinit var binding: ActivityMainBinding
 
     private val viewModel: MainViewModel by viewModels {

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Instagram to Google Maps</string>
+    <string name="app_name">InstaMaps</string>
     <string name="share_hint">Share an Instagram reel to extract its location</string>
     <string name="location_hint">Location</string>
     <string name="add_to_google_maps">Add to Google Maps</string>

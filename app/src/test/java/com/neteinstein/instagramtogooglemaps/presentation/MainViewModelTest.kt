@@ -23,7 +23,6 @@ import org.mockito.kotlin.whenever
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class MainViewModelTest {
-
     @get:Rule
     val instantTaskExecutorRule = InstantTaskExecutorRule()
 
@@ -52,75 +51,80 @@ class MainViewModelTest {
     }
 
     @Test
-    fun `processSharedUrl sets Loading state`() = runTest {
-        whenever(getReelInfoUseCase(any())).thenReturn(
-            Result.success(ReelInfo("url", "desc", "author"))
-        )
-        whenever(extractLocationUseCase(any())).thenReturn(
-            LocationInfo("Test Location", "desc")
-        )
+    fun `processSharedUrl sets Loading state`() =
+        runTest {
+            whenever(getReelInfoUseCase(any())).thenReturn(
+                Result.success(ReelInfo("url", "desc", "author")),
+            )
+            whenever(extractLocationUseCase(any())).thenReturn(
+                LocationInfo("Test Location", "desc"),
+            )
 
-        viewModel.processSharedUrl("https://www.instagram.com/reel/test")
-        assertEquals(MainUiState.Loading, viewModel.uiState.value)
-    }
-
-    @Test
-    fun `processSharedUrl sets LocationFound when location extracted`() = runTest {
-        val url = "https://www.instagram.com/reel/test"
-        val reelInfo = ReelInfo(url, "Location: Paris, France", "testuser")
-        val locationInfo = LocationInfo("Paris, France", "Location: Paris, France")
-
-        whenever(getReelInfoUseCase(url)).thenReturn(Result.success(reelInfo))
-        whenever(extractLocationUseCase(reelInfo.description)).thenReturn(locationInfo)
-
-        viewModel.processSharedUrl(url)
-        testDispatcher.scheduler.advanceUntilIdle()
-
-        val state = viewModel.uiState.value
-        assertTrue(state is MainUiState.LocationFound)
-        assertEquals("Paris, France", (state as MainUiState.LocationFound).location)
-    }
+            viewModel.processSharedUrl("https://www.instagram.com/reel/test")
+            assertEquals(MainUiState.Loading, viewModel.uiState.value)
+        }
 
     @Test
-    fun `processSharedUrl sets Error when no location found`() = runTest {
-        val url = "https://www.instagram.com/reel/test"
-        val reelInfo = ReelInfo(url, "Just a cool post", "testuser")
+    fun `processSharedUrl sets LocationFound when location extracted`() =
+        runTest {
+            val url = "https://www.instagram.com/reel/test"
+            val reelInfo = ReelInfo(url, "Location: Paris, France", "testuser")
+            val locationInfo = LocationInfo("Paris, France", "Location: Paris, France")
 
-        whenever(getReelInfoUseCase(url)).thenReturn(Result.success(reelInfo))
-        whenever(extractLocationUseCase(reelInfo.description)).thenReturn(null)
+            whenever(getReelInfoUseCase(url)).thenReturn(Result.success(reelInfo))
+            whenever(extractLocationUseCase(reelInfo.description)).thenReturn(locationInfo)
 
-        viewModel.processSharedUrl(url)
-        testDispatcher.scheduler.advanceUntilIdle()
+            viewModel.processSharedUrl(url)
+            testDispatcher.scheduler.advanceUntilIdle()
 
-        val state = viewModel.uiState.value
-        assertTrue(state is MainUiState.Error)
-    }
-
-    @Test
-    fun `processSharedUrl sets Error when fetch fails`() = runTest {
-        val url = "https://www.instagram.com/reel/test"
-        val exception = RuntimeException("Network error")
-
-        whenever(getReelInfoUseCase(url)).thenReturn(Result.failure(exception))
-
-        viewModel.processSharedUrl(url)
-        testDispatcher.scheduler.advanceUntilIdle()
-
-        val state = viewModel.uiState.value
-        assertTrue(state is MainUiState.Error)
-        assertEquals("Network error", (state as MainUiState.Error).message)
-    }
+            val state = viewModel.uiState.value
+            assertTrue(state is MainUiState.LocationFound)
+            assertEquals("Paris, France", (state as MainUiState.LocationFound).location)
+        }
 
     @Test
-    fun `processSharedUrl sets Error with default message when exception has no message`() = runTest {
-        val url = "https://www.instagram.com/reel/test"
-        whenever(getReelInfoUseCase(url)).thenReturn(Result.failure(RuntimeException()))
+    fun `processSharedUrl sets Error when no location found`() =
+        runTest {
+            val url = "https://www.instagram.com/reel/test"
+            val reelInfo = ReelInfo(url, "Just a cool post", "testuser")
 
-        viewModel.processSharedUrl(url)
-        testDispatcher.scheduler.advanceUntilIdle()
+            whenever(getReelInfoUseCase(url)).thenReturn(Result.success(reelInfo))
+            whenever(extractLocationUseCase(reelInfo.description)).thenReturn(null)
 
-        val state = viewModel.uiState.value
-        assertTrue(state is MainUiState.Error)
-        assertEquals("Failed to fetch reel information", (state as MainUiState.Error).message)
-    }
+            viewModel.processSharedUrl(url)
+            testDispatcher.scheduler.advanceUntilIdle()
+
+            val state = viewModel.uiState.value
+            assertTrue(state is MainUiState.Error)
+        }
+
+    @Test
+    fun `processSharedUrl sets Error when fetch fails`() =
+        runTest {
+            val url = "https://www.instagram.com/reel/test"
+            val exception = RuntimeException("Network error")
+
+            whenever(getReelInfoUseCase(url)).thenReturn(Result.failure(exception))
+
+            viewModel.processSharedUrl(url)
+            testDispatcher.scheduler.advanceUntilIdle()
+
+            val state = viewModel.uiState.value
+            assertTrue(state is MainUiState.Error)
+            assertEquals("Network error", (state as MainUiState.Error).message)
+        }
+
+    @Test
+    fun `processSharedUrl sets Error with default message when exception has no message`() =
+        runTest {
+            val url = "https://www.instagram.com/reel/test"
+            whenever(getReelInfoUseCase(url)).thenReturn(Result.failure(RuntimeException()))
+
+            viewModel.processSharedUrl(url)
+            testDispatcher.scheduler.advanceUntilIdle()
+
+            val state = viewModel.uiState.value
+            assertTrue(state is MainUiState.Error)
+            assertEquals("Failed to fetch reel information", (state as MainUiState.Error).message)
+        }
 }

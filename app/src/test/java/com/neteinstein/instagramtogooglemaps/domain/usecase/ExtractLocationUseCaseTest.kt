@@ -7,7 +7,6 @@ import org.junit.Before
 import org.junit.Test
 
 class ExtractLocationUseCaseTest {
-
     private lateinit var useCase: ExtractLocationUseCase
 
     @Before

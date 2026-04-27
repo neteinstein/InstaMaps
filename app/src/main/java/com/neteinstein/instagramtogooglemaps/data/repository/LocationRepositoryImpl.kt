@@ -7,19 +7,17 @@ import com.neteinstein.instagramtogooglemaps.domain.repository.LocationRepositor
 class LocationRepositoryImpl(
     private val api: InstagramOEmbedApi,
 ) : LocationRepository {
-
-    override suspend fun getReelInfo(url: String): Result<ReelInfo> {
-        return try {
+    override suspend fun getReelInfo(url: String): Result<ReelInfo> =
+        try {
             val response = api.getOEmbed(url)
             Result.success(
                 ReelInfo(
                     url = url,
                     description = response.title ?: "",
                     authorName = response.authorName ?: "",
-                )
+                ),
             )
         } catch (e: Exception) {
             Result.failure(e)
         }
-    }
 }
