@@ -21,9 +21,8 @@ import java.util.UUID
  * profiles - most of the end-to-end latency win happens here, before extraction even starts.
  *
  * [YoutubeDL.init]/[FFmpeg.init] are idempotent internally but do real file-extraction work the
- * first time, so initialization is deferred to the first real download rather than app startup:
- * many shares are resolved by the caption fast path and never need this GPL-licensed download
- * path at all.
+ * first time, so initialization is deferred to the first real download rather than app startup,
+ * keeping cold-start latency down for a component that only runs inside the background worker.
  */
 class YtDlpVideoDownloadRepository(
     private val context: Context,

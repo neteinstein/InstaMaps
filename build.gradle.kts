@@ -20,8 +20,11 @@ dependencies {
     kover(project(":feature:maps"))
     kover(project(":feature:geocoding"))
     kover(project(":feature:videoprocessing"))
-    // TODO(build-verify): add kover(project(":feature:share")) and kover(project(":app")) once
-    // those modules are re-enabled in settings.gradle.kts.
+    kover(project(":feature:share"))
+    // :app is intentionally excluded: it is a pure composition root (Application class + a single
+    // trampoline Activity wiring Koin/manifest intent-filters together) with no domain/data logic
+    // of its own to cover - the same rationale as the `*.di`/`*.presentation`/`*.work` excludes
+    // below, just for a whole module instead of a package.
 }
 
 kover {
@@ -29,11 +32,20 @@ kover {
         filters {
             excludes {
                 // Koin `di` modules are declarative wiring (a list of `factory { }`/`single { }`
-                // calls) with no branching logic worth measuring; Compose UI in the design system
-                // has no business logic and isn't exercisable without instrumentation/Robolectric,
-                // which this project doesn't use. Extend this list as new UI packages land in
-                // feature modules (e.g. a future `*.presentation` package).
-                packages("*.di", "org.neteinstein.instamaps.core.designsystem*")
+                // calls) with no branching logic worth measuring; Compose UI (design system and
+                // feature:share's `presentation` package) has no business logic and isn't
+                // exercisable without instrumentation/Robolectric, which this project doesn't use.
+                // `feature:share`'s `work` package (WorkManager worker + notification glue) is in
+                // the same boat: it's Android-framework glue (CoroutineWorker/NotificationManager)
+                // that can't be meaningfully unit tested on the JVM either, so the pipeline logic
+                // it calls into (`ProcessSharedUrlUseCase`) is what's covered instead. Extend this
+                // list as new UI/framework-glue packages land in feature modules.
+                packages(
+                    "*.di",
+                    "*.presentation",
+                    "*.work",
+                    "org.neteinstein.instamaps.core.designsystem*",
+                )
             }
         }
     }

@@ -20,6 +20,5 @@ include(":core:designsystem")
 include(":feature:maps")
 include(":feature:geocoding")
 include(":feature:videoprocessing")
-// TODO(build-verify): re-enable as each module is scaffolded.
-// include(":app")
-// include(":feature:share")
+include(":feature:share")
+include(":app")

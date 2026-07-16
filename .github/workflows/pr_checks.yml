@@ -142,7 +142,7 @@ jobs:
             {
               echo "### Line Coverage: ${PCT}%"
               echo ""
-              echo "Covered $COVERED / $TOTAL lines. \`di\` packages and \`core:designsystem\` are excluded (see root \`build.gradle.kts\`)."
+              echo "Covered $COVERED / $TOTAL lines. \`di\`/\`presentation\`/\`work\` packages and \`core:designsystem\` are excluded (see root \`build.gradle.kts\`)."
               echo ""
               echo "Full HTML report uploaded as the \`coverage-report\` artifact."
             } >> "$GITHUB_STEP_SUMMARY"

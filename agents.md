@@ -34,8 +34,8 @@ logic belongs in `core:common` instead.
 | `feature:maps`           | domain, di          | Builds the Google Maps deep link (`BuildMapsDeepLinkUseCase`) and launches it (`MapsLauncher`, with a browser fallback if the Maps app isn't installed) | Active |
 | `feature:geocoding`      | domain, data, di    | `SearchPlaceUseCase` against the Places SDK (`PlacesSdkPlaceSearchRepository`)                              | Active |
 | `feature:videoprocessing`| domain, data, di    | Downloads the shared video (yt-dlp), extracts frames (`MediaMetadataRetriever`), OCRs them (ML Kit text recognition + entity extraction), turns raw text into `LocationCandidate`s | Active |
-| `feature:share`          | -                   | Share-target intent handling; orchestrates the other features behind a ViewModel                            | Not yet built (excluded from `settings.gradle.kts`) |
-| `app`                    | -                   | Composition root: `Application` class, Koin startup, single Activity/NavHost                                | Disabled in `settings.gradle.kts`; only resource scaffolding remains from the pre-rewrite app |
+| `feature:share`          | domain, presentation, work, di | Parses the shared URL, runs the video pipeline via `feature:videoprocessing`/`feature:geocoding` to resolve a `MapsDestination`, drives it from a `WorkManager` `CoroutineWorker` (survives the app being backgrounded) with a result notification, and renders an animated Compose UI (`ShareScreen`) that mirrors the same job | Active |
+| `app`                    | presentation        | Composition root: `InstaMapsApplication` starts Koin with every feature/core module; `MainActivity` is the single UI entry point, handling launcher taps, the Instagram/TikTok share target, and the result-notification deep-link trampoline into `MapsLauncher` | Active |
 
 `settings.gradle.kts` is the source of truth for which modules are part of the build - a module
 commented out there is not compiled, tested, or linted, and should not be assumed to exist.
@@ -43,13 +43,14 @@ commented out there is not compiled, tested, or linted, and should not be assume
 ## Tech Stack
 
 - **Language**: Kotlin, JVM target 17
-- **Min SDK**: 27; **Compile SDK**: 36 (target SDK will be pinned once the `app` module is rebuilt)
+- **Min SDK**: 27; **Compile SDK / Target SDK**: 36
 - **UI**: Jetpack Compose (Material 3 via the Compose BOM) - no XML layouts, no ViewBinding
 - **Architecture**: MVVM, `ViewModel` + Compose state/`StateFlow` (no LiveData)
 - **Concurrency**: Kotlin Coroutines (`viewModelScope`, dispatchers behind `DispatcherProvider`
   so tests can inject a test dispatcher instead of patching `Dispatchers.Main`)
 - **DI**: Koin (`koin-android`, `koin-androidx-compose`) - constructor injection into use cases
-  and repositories, `koinViewModel()` in Compose
+  and repositories, `koinViewModel()` in Compose. `InstaMapsApplication` (in `app`) is the single
+  `startKoin { }` call site, wiring every feature/core module's Koin module together
 - **Video download**: yt-dlp via `youtubedl-android`, forced to `bestvideo[height<=480]+bestaudio/best[height<=480]`
   to keep the download small and the on-device decode fast (see `YtDlpVideoDownloadRepository`)
 - **Frame extraction**: `MediaMetadataRetriever` with `OPTION_CLOSEST_SYNC` (snap to keyframes,
@@ -58,11 +59,28 @@ commented out there is not compiled, tested, or linted, and should not be assume
   (see `MediaMetadataRetrieverFrameExtractor`, `ExtractLocationCandidatesUseCase`)
 - **OCR / entity extraction**: Google ML Kit, on-device Text Recognition + Entity Extraction
 - **Geocoding**: Google Places SDK for Android
+- **Background processing**: `WorkManager` (`CoroutineWorker`) runs the download -> OCR -> geocode
+  pipeline so it survives the app being backgrounded right after a share (the common case, since
+  the user was just in Instagram/TikTok); progress is observed via `getWorkInfoByIdFlow` for the
+  in-app animated UI, and a result notification (tap to deep-link straight into Maps) fires
+  regardless of whether the app is still in the foreground (see `ProcessSharedUrlWorker`,
+  `ShareNotifier`, `ShareViewModel`)
 - **Testing**: JUnit 4, Mockito-Kotlin, `kotlinx-coroutines-test`
 - **Linting**: ktlint via `org.jlleitschuh.gradle.ktlint`
 - **Coverage**: Kover (`org.jetbrains.kotlinx.kover`)
 
 ## Development Setup
+
+Create a `secrets.properties` file at the repo root (gitignored) with a real Places API key:
+
+```properties
+PLACES_API_KEY=your-real-key-here
+```
+
+Get a key at the [Google Cloud Console](https://console.cloud.google.com/google/maps-apis) with
+"Places API (New)" enabled. Without this file, the build falls back to `local.defaults.properties`
+(a committed placeholder) so a clean checkout still compiles, but Places lookups will fail at
+runtime with an invalid-key error. See `app/build.gradle.kts`'s `secrets { }` block.
 
 ```bash
 # Build every active module
@@ -89,11 +107,15 @@ commented out there is not compiled, tested, or linted, and should not be assume
   plain JUnit tests - this project has no emulator/instrumentation tests, so anything that can't
   be reasonably unit-tested (e.g. framework glue that just calls `context.startActivity`) should
   be kept thin rather than pulling in Robolectric.
-- Target **80%+ line coverage** on `domain` and `data` packages. `di` packages and
-  `core:designsystem` (pure Compose UI, no branching logic) are excluded from the coverage
-  denominator - see the `kover { reports { filters { excludes { ... } } } }` block in the root
-  `build.gradle.kts`. When you add a new module or a new UI-only package, extend that exclude
-  list rather than letting UI code silently drag the aggregate number down.
+- Target **80%+ line coverage** on `domain` and `data` packages. `di`, `presentation`, and `work`
+  packages, plus `core:designsystem` (pure Compose UI / WorkManager-and-notification glue with no
+  business logic worth measuring, none of it exercisable without instrumentation/Robolectric,
+  which this project doesn't use), are excluded from the coverage denominator - see the
+  `kover { reports { filters { excludes { ... } } } }` block in the root `build.gradle.kts`. When
+  you add a new module or a new UI/framework-glue-only package, extend that exclude list rather
+  than letting it silently drag the aggregate number down. `app` is excluded as a whole module
+  (not added to the `dependencies { kover(project(...)) }` list at all) for the same reason: it is
+  a pure composition root with no domain/data logic of its own.
 - Use `UnconfinedTestDispatcher`/`StandardTestDispatcher` (from `kotlinx-coroutines-test`) for
   coroutine-based code. Prefer hand-rolled fakes over Mockito mocks for repository interfaces
   where practical - cheaper to read and keep in sync than a mock's stubbing chain.

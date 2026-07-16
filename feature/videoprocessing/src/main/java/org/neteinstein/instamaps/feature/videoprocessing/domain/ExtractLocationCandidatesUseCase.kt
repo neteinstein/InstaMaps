@@ -14,8 +14,8 @@ import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * Downloads a shared video, then extracts location candidates from it, reporting progress as it
- * goes. This is the "slow path" of the app - `feature:share`'s orchestrator only calls it when
- * the caption alone (run through the same [LocationTextParser]) wasn't enough.
+ * goes. This is `feature:share`'s only source of location candidates - see
+ * `ProcessSharedUrlUseCase`, which runs this and then resolves the ranked candidates it emits.
  *
  * Implements the producer/consumer pipeline from the perf brief: a single producer coroutine
  * pulls frames out of [frameExtractorRepository] and pushes them onto a [Channel], while

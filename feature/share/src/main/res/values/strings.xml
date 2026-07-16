@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="share_notification_channel_name">Location processing</string>
+    <string name="share_notification_processing_title">Finding the location…</string>
+    <string name="share_notification_found_title">Location found!</string>
+    <string name="share_notification_not_found_title">No location found</string>
+    <string name="share_notification_failed_title">Something went wrong</string>
+
+    <string name="share_idle_title">Share a video to find its location</string>
+    <string name="share_idle_subtitle">Share an Instagram or TikTok video with InstaMaps and we\'ll find where it was filmed.</string>
+
+    <string name="share_stage_downloading">Downloading video…</string>
+    <string name="share_stage_extracting_frames">Extracting frames…</string>
+    <string name="share_stage_analyzing_frame">Reading on-screen text…</string>
+    <string name="share_stage_geocoding">Searching for the place…</string>
+
+    <string name="share_found_open_maps">Open in Google Maps</string>
+    <string name="share_not_found_title">No location found</string>
+    <string name="share_error_title">Something went wrong</string>
+</resources>
