@@ -7,6 +7,7 @@ import com.yausername.youtubedl_android.YoutubeDLRequest
 import kotlinx.coroutines.withContext
 import org.neteinstein.instamaps.core.common.AppError
 import org.neteinstein.instamaps.core.common.DispatcherProvider
+import org.neteinstein.instamaps.core.common.describeOrDefault
 import org.neteinstein.instamaps.core.common.safeCall
 import org.neteinstein.instamaps.feature.videoprocessing.domain.DownloadedVideo
 import org.neteinstein.instamaps.feature.videoprocessing.domain.VideoDownloadRepository
@@ -31,7 +32,7 @@ class YtDlpVideoDownloadRepository(
     private var initialized = false
 
     override suspend fun download(url: String): Result<DownloadedVideo> =
-        safeCall(mapError = { AppError.Network("Video download failed", it) }) {
+        safeCall(mapError = { AppError.Network(it.describeOrDefault("Video download failed"), it) }) {
             withContext(dispatcherProvider.io) {
                 ensureInitialized()
 

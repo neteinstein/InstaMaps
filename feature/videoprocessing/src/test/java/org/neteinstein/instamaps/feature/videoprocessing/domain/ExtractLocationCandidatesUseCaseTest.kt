@@ -3,6 +3,8 @@ package org.neteinstein.instamaps.feature.videoprocessing.domain
 import android.graphics.Bitmap
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -46,6 +48,15 @@ private class FakeFrameExtractorRepository(
         video: DownloadedVideo,
         intervalMs: Long,
     ) = flowOf(*frames.toTypedArray())
+}
+
+private class FailingFrameExtractorRepository(
+    private val error: Throwable,
+) : FrameExtractorRepository {
+    override fun extractFrames(
+        video: DownloadedVideo,
+        intervalMs: Long,
+    ): Flow<VideoFrame> = flow { throw error }
 }
 
 private class FakeTextRecognitionRepository(
@@ -174,5 +185,29 @@ class ExtractLocationCandidatesUseCaseTest {
 
             val completed = progress.filterIsInstance<VideoAnalysisProgress.Completed>().single()
             assertTrue(completed.candidates.isEmpty())
+        }
+
+    @Test
+    fun `emits Failed instead of crashing when frame extraction throws`() =
+        runTest {
+            val error = IllegalStateException("setDataSource failed")
+            val repository = FakeVideoDownloadRepository()
+            val useCase =
+                ExtractLocationCandidatesUseCase(
+                    videoDownloadRepository = repository,
+                    frameExtractorRepository = FailingFrameExtractorRepository(error),
+                    textRecognitionRepository = FakeTextRecognitionRepository(emptyMap()),
+                    locationTextAnalyzer = LocationTextAnalyzer(FakeEntityExtractionRepository(), LocationTextParser()),
+                    dispatcherProvider = TestDispatcherProvider(),
+                )
+
+            val progress = useCase("https://instagram.com/reel/abc").toList()
+
+            assertEquals(
+                listOf(VideoAnalysisProgress.Downloading, VideoAnalysisProgress.ExtractingFrames, VideoAnalysisProgress.Failed(error)),
+                progress,
+            )
+            assertTrue(progress.none { it is VideoAnalysisProgress.Completed })
+            assertNotNull("the downloaded video should still be cleaned up after a mid-pipeline failure", repository.deletedVideo)
         }
 }
