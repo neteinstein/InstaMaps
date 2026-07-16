@@ -172,4 +172,7 @@ publishes it as a GitHub Release tagged `v1.0.<run number>`. `versionCode`/`vers
 overridden at build time via `APP_VERSION_CODE`/`APP_VERSION_NAME` env vars derived from the run
 number (see the `signingConfigs`/`defaultConfig` blocks in `app/build.gradle.kts`). All five
 secrets are required; the workflow fails fast if any are missing rather than shipping an
-unsigned or non-functional build.
+unsigned or non-functional build. The built APK is renamed to `InstaMaps_version<version>.apk`
+(dots replaced with underscores, e.g. `InstaMaps_version1_0_42.apk`) before being uploaded as the
+release asset, and the APK's SHA-1 checksum is computed and prepended to the auto-generated
+release notes so it can be verified after download.
