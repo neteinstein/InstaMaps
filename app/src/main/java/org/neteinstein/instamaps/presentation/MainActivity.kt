@@ -3,28 +3,40 @@ package org.neteinstein.instamaps.presentation
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import org.koin.android.ext.android.inject
 import org.neteinstein.instamaps.core.designsystem.theme.InstaMapsTheme
 import org.neteinstein.instamaps.feature.maps.MapsLauncher
 import org.neteinstein.instamaps.feature.maps.domain.MapsDestination
+import org.neteinstein.instamaps.feature.settings.presentation.SettingsRoute
 import org.neteinstein.instamaps.feature.share.presentation.ShareRoute
-import org.neteinstein.instamaps.feature.share.presentation.ShareScreen
-import org.neteinstein.instamaps.feature.share.presentation.ShareUiState
 import org.neteinstein.instamaps.feature.share.work.ShareDeepLink
 
 /**
  * Single-Activity host for all three ways InstaMaps can be entered - see the three
  * `<intent-filter>` blocks on this activity in the manifest:
  *
- * 1. Plain launcher tap: no shared text, renders [ShareUiState.Idle] directly.
- * 2. Instagram/TikTok share ([Intent.ACTION_SEND], `text/plain`): renders [ShareRoute], which owns
- *    the whole download/OCR/geocode pipeline and its animated UI.
+ * 1. Plain launcher tap: no shared text, renders [ShareRoute] with a `null` `sharedText` - which
+ *    is also what renders the main-screen readiness warnings (missing API key/permissions) since
+ *    they're computed inside [ShareRoute] regardless of how the screen was reached.
+ * 2. Instagram/TikTok share ([Intent.ACTION_SEND], `text/plain`): renders [ShareRoute] with the
+ *    shared text - it owns the whole download/OCR/geocode pipeline and its animated UI, but only
+ *    starts it once ready; otherwise the main screen with warnings shows instead (see
+ *    [ShareRoute]'s doc).
  * 3. Result-notification tap ([ShareDeepLink.ACTION_OPEN_MAPS_DESTINATION], fired once the
  *    background [org.neteinstein.instamaps.feature.share.work.ProcessSharedUrlWorker] finds a
  *    place): a pure trampoline - hand off to [MapsLauncher] and finish immediately, without ever
  *    drawing this app's own UI, since the pipeline already completed in the background.
+ *
+ * Also owns the Main/Settings toggle: there's no Navigation-Compose in this app, so opening
+ * Settings (the top-right button on the main screen) is just a local `showSettings` flag flipped
+ * back by either the Settings screen's back arrow or the system back gesture/button.
  */
 class MainActivity : ComponentActivity() {
     private val mapsLauncher: MapsLauncher by inject()
@@ -42,12 +54,15 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             InstaMapsTheme {
-                if (sharedText != null) {
-                    ShareRoute(sharedText = sharedText)
+                var showSettings by rememberSaveable { mutableStateOf(false) }
+                BackHandler(enabled = showSettings) { showSettings = false }
+
+                if (showSettings) {
+                    SettingsRoute(onBack = { showSettings = false })
                 } else {
-                    ShareScreen(
-                        uiState = ShareUiState.Idle,
-                        onOpenMaps = { mapsLauncher.launch(it) },
+                    ShareRoute(
+                        sharedText = sharedText,
+                        onOpenSettings = { showSettings = true },
                     )
                 }
             }

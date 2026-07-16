@@ -30,12 +30,14 @@ logic belongs in `core:common` instead.
 | Module                  | Layers present     | Responsibility                                                                                            | Status |
 |--------------------------|---------------------|------------------------------------------------------------------------------------------------------------|--------|
 | `core:common`            | domain, di          | `AppError`, `DispatcherProvider`, `LatLng`, `safeCall` - shared primitives used across every module         | Active |
-| `core:designsystem`      | Compose UI, theme   | Shared Compose theme/typography + reusable components (`PrimaryButton`, `LoadingIndicator`, `ErrorMessage`) | Active |
+| `core:designsystem`      | Compose UI, theme   | Shared Compose theme/typography + reusable components (`PrimaryButton`, `LoadingIndicator`, `ErrorMessage`, `WarningBanner`) | Active |
+| `core:settings`          | domain, data, di    | `AppSettingsRepository` - persists the user-entered Places API key in Jetpack DataStore Preferences (covered by the app's Auto Backup, so it syncs to a user's other devices) | Active |
 | `feature:maps`           | domain, di          | Builds the Google Maps deep link (`BuildMapsDeepLinkUseCase`) and launches it (`MapsLauncher`, with a browser fallback if the Maps app isn't installed) | Active |
-| `feature:geocoding`      | domain, data, di    | `SearchPlaceUseCase` against the Places SDK (`PlacesSdkPlaceSearchRepository`)                              | Active |
+| `feature:geocoding`      | domain, data, di    | `SearchPlaceUseCase` against the Places SDK (`PlacesSdkPlaceSearchRepository`), which lazily (re)initializes the SDK from `core:settings`'s current API key on every call instead of a build-time constant | Active |
 | `feature:videoprocessing`| domain, data, di    | Downloads the shared video (yt-dlp), extracts frames (`MediaMetadataRetriever`), OCRs them (ML Kit text recognition + entity extraction), turns raw text into `LocationCandidate`s | Active |
-| `feature:share`          | domain, presentation, work, di | Parses the shared URL, runs the video pipeline via `feature:videoprocessing`/`feature:geocoding` to resolve a `MapsDestination`, drives it from a `WorkManager` `CoroutineWorker` (survives the app being backgrounded) with a result notification, and renders an animated Compose UI (`ShareScreen`) that mirrors the same job | Active |
-| `app`                    | presentation        | Composition root: `InstaMapsApplication` starts Koin with every feature/core module; `MainActivity` is the single UI entry point, handling launcher taps, the Instagram/TikTok share target, and the result-notification deep-link trampoline into `MapsLauncher` | Active |
+| `feature:share`          | domain, presentation, work, di | Parses the shared URL, runs the video pipeline via `feature:videoprocessing`/`feature:geocoding` to resolve a `MapsDestination`, drives it from a `WorkManager` `CoroutineWorker` (survives the app being backgrounded) with a result notification, and renders an animated Compose UI (`ShareScreen`) that mirrors the same job. The idle/main screen also renders readiness warnings (missing API key, missing runtime permissions) with per-item action buttons, and gates auto-starting the pipeline on a shared video until they're resolved | Active |
+| `feature:settings`       | presentation, di    | The Settings screen (`SettingsScreen`/`SettingsViewModel`) the user pastes their Places API key into - reachable from the top-right button on `feature:share`'s main screen; delegates persistence to `core:settings` | Active |
+| `app`                    | presentation        | Composition root: `InstaMapsApplication` starts Koin with every feature/core module; `MainActivity` is the single UI entry point, handling launcher taps, the Instagram/TikTok share target, the result-notification deep-link trampoline into `MapsLauncher`, and toggling between the main (`feature:share`) and Settings (`feature:settings`) screens | Active |
 
 `settings.gradle.kts` is the source of truth for which modules are part of the build - a module
 commented out there is not compiled, tested, or linted, and should not be assumed to exist.
@@ -65,22 +67,23 @@ commented out there is not compiled, tested, or linted, and should not be assume
   in-app animated UI, and a result notification (tap to deep-link straight into Maps) fires
   regardless of whether the app is still in the foreground (see `ProcessSharedUrlWorker`,
   `ShareNotifier`, `ShareViewModel`)
+- **Settings persistence**: Jetpack DataStore Preferences (`core:settings`) stores the
+  user-entered Places API key under the app's `filesDir`, covered by the manifest's existing
+  `android:allowBackup="true"` Auto Backup - no separate sync/backup plumbing needed for it to
+  carry over to a user's other devices
 - **Testing**: JUnit 4, Mockito-Kotlin, `kotlinx-coroutines-test`
 - **Linting**: ktlint via `org.jlleitschuh.gradle.ktlint`
 - **Coverage**: Kover (`org.jetbrains.kotlinx.kover`)
 
 ## Development Setup
 
-Create a `secrets.properties` file at the repo root (gitignored) with a real Places API key:
-
-```properties
-PLACES_API_KEY=your-real-key-here
-```
-
-Get a key at the [Google Cloud Console](https://console.cloud.google.com/google/maps-apis) with
-"Places API (New)" enabled. Without this file, the build falls back to `local.defaults.properties`
-(a committed placeholder) so a clean checkout still compiles, but Places lookups will fail at
-runtime with an invalid-key error. See `app/build.gradle.kts`'s `secrets { }` block.
+No build-time secrets file is required - a clean checkout compiles and runs as-is. The Places API
+key is entered at runtime: launch the app, tap the settings icon (top right of the main screen),
+paste in a key, and tap Save. Get a key at the
+[Google Cloud Console](https://console.cloud.google.com/google/maps-apis) with "Places API (New)"
+enabled. Until a key is saved, the main screen shows a warning (with a button straight to
+Settings) instead of attempting to geocode - see `feature:share`'s `ShareScreen`/`ShareViewModel`
+and `feature:settings`.
 
 ```bash
 # Build every active module
@@ -167,12 +170,14 @@ A PR can only be merged once `lint`, `compile`, and `test` pass.
 `workflow_dispatch`. It re-runs `ktlintCheck` and `test` against the exact commit landing on
 `main` - necessary because squash/rebase merges produce a commit that PR Checks never directly
 built - then builds a release APK signed with a keystore decoded from the `KEYSTORE_BASE64` /
-`KEYSTORE_PASSWORD` / `KEY_ALIAS` / `KEY_PASSWORD` secrets and a real `PLACES_API_KEY` secret, and
-publishes it as a GitHub Release tagged `v1.0.<run number>`. `versionCode`/`versionName` are
-overridden at build time via `APP_VERSION_CODE`/`APP_VERSION_NAME` env vars derived from the run
-number (see the `signingConfigs`/`defaultConfig` blocks in `app/build.gradle.kts`). All five
-secrets are required; the workflow fails fast if any are missing rather than shipping an
-unsigned or non-functional build. The built APK is renamed to `InstaMaps_version<version>.apk`
-(dots replaced with underscores, e.g. `InstaMaps_version1_0_42.apk`) before being uploaded as the
-release asset, and the APK's SHA-1 checksum is computed and prepended to the auto-generated
-release notes so it can be verified after download.
+`KEYSTORE_PASSWORD` / `KEY_ALIAS` / `KEY_PASSWORD` secrets, and publishes it as a GitHub Release
+tagged `v1.0.<run number>`. `versionCode`/`versionName` are overridden at build time via
+`APP_VERSION_CODE`/`APP_VERSION_NAME` env vars derived from the run number (see the
+`signingConfigs`/`defaultConfig` blocks in `app/build.gradle.kts`). All four secrets are required;
+the workflow fails fast if any are missing rather than shipping an unsigned or non-functional
+build. The Places API key is not part of this workflow - it's a runtime, user-entered value (see
+Development Setup), not a build-time secret. The built APK is renamed to
+`InstaMaps_version<version>.apk` (dots replaced with underscores, e.g.
+`InstaMaps_version1_0_42.apk`) before being uploaded as the release asset, and the APK's SHA-1
+checksum is computed and prepended to the auto-generated release notes so it can be verified after
+download.

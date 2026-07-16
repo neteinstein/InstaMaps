@@ -1,5 +1,6 @@
 package org.neteinstein.instamaps.feature.share.presentation
 
+import android.Manifest
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -24,6 +25,7 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -32,9 +34,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -58,30 +62,47 @@ import kotlinx.coroutines.delay
 import org.koin.androidx.compose.koinViewModel
 import org.koin.compose.koinInject
 import org.neteinstein.instamaps.core.designsystem.component.PrimaryButton
+import org.neteinstein.instamaps.core.designsystem.component.WarningBanner
 import org.neteinstein.instamaps.core.designsystem.theme.MapsGreen
 import org.neteinstein.instamaps.feature.maps.MapsLauncher
 import org.neteinstein.instamaps.feature.maps.domain.MapsDestination
 import org.neteinstein.instamaps.feature.share.R
 
 /**
- * Stateful entry point: parses the incoming share text once, then renders [ShareScreen] driven by
- * [ShareViewModel]'s [ShareUiState].
+ * Stateful entry point: parses the incoming share text once ready, then renders [ShareScreen]
+ * driven by [ShareViewModel]'s [ShareUiState]. [sharedText] is `null` for a plain launcher open;
+ * either way, this always renders (never bypasses) so main-screen readiness warnings - missing
+ * API key, missing permissions - are computed and shown in one place regardless of how the
+ * screen was reached. Processing only starts once [isReady]: a video shared while something is
+ * missing leaves the main screen showing those warnings instead of starting the pipeline, and
+ * automatically proceeds the moment the user resolves them (grants the permission, saves a key).
  */
 @Composable
 fun ShareRoute(
-    sharedText: String,
+    sharedText: String?,
+    onOpenSettings: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: ShareViewModel = koinViewModel(),
     mapsLauncher: MapsLauncher = koinInject(),
 ) {
-    LaunchedEffect(sharedText) {
-        viewModel.onSharedTextReceived(sharedText)
+    val hasPlacesApiKey by viewModel.hasPlacesApiKey.collectAsStateWithLifecycle()
+    val permissionStates = requiredRuntimePermissions().map { rememberRuntimePermissionState(it) }
+    val missingPermissions = permissionStates.filter { it.status != RuntimePermissionStatus.GRANTED }
+    val isReady = hasPlacesApiKey == true && missingPermissions.isEmpty()
+
+    LaunchedEffect(sharedText, isReady) {
+        if (sharedText != null && isReady) {
+            viewModel.onSharedTextReceived(sharedText)
+        }
     }
 
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     ShareScreen(
         uiState = uiState,
         onOpenMaps = { mapsLauncher.launch(it) },
+        showApiKeyWarning = hasPlacesApiKey == false,
+        missingPermissions = missingPermissions,
+        onOpenSettings = onOpenSettings,
         modifier = modifier,
     )
 }
@@ -95,12 +116,20 @@ fun ShareRoute(
  * When [uiState] becomes [ShareUiState.Found], automatically opens Google Maps after a short delay
  * so the user gets to see the "found it" moment before being handed off - the button remains as an
  * immediate/manual alternative.
+ *
+ * [showApiKeyWarning]/[missingPermissions]/[onOpenSettings] only affect the [ShareUiState.Idle]
+ * branch - the main screen - since that's the only state a user can be looking at while
+ * something required is missing (processing/found/etc. only happen once [ShareRoute] has already
+ * gated on readiness).
  */
 @Composable
 fun ShareScreen(
     uiState: ShareUiState,
     onOpenMaps: (MapsDestination) -> Unit,
+    onOpenSettings: () -> Unit,
     modifier: Modifier = Modifier,
+    showApiKeyWarning: Boolean = false,
+    missingPermissions: List<RuntimePermissionState> = emptyList(),
 ) {
     LaunchedEffect(uiState) {
         if (uiState is ShareUiState.Found) {
@@ -122,7 +151,12 @@ fun ShareScreen(
             label = "share_ui_state",
         ) { state ->
             when (state) {
-                is ShareUiState.Idle -> IdleContent()
+                is ShareUiState.Idle ->
+                    IdleContent(
+                        showApiKeyWarning = showApiKeyWarning,
+                        missingPermissions = missingPermissions,
+                        onOpenSettings = onOpenSettings,
+                    )
                 is ShareUiState.Processing -> ProcessingContent(stage = state.stage)
                 is ShareUiState.Found ->
                     FoundContent(
@@ -149,24 +183,79 @@ fun ShareScreen(
 }
 
 @Composable
-private fun IdleContent(modifier: Modifier = Modifier) {
-    CenteredContent(modifier) {
-        IconBadge(icon = Icons.Default.Place, tint = MaterialTheme.colorScheme.onPrimaryContainer)
-        Spacer(modifier = Modifier.height(24.dp))
-        Text(
-            text = stringResource(R.string.share_idle_title),
-            style = MaterialTheme.typography.titleLarge,
-            textAlign = TextAlign.Center,
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            text = stringResource(R.string.share_idle_subtitle),
-            style = MaterialTheme.typography.bodyLarge,
-            textAlign = TextAlign.Center,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+private fun IdleContent(
+    showApiKeyWarning: Boolean,
+    missingPermissions: List<RuntimePermissionState>,
+    onOpenSettings: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Box(modifier = modifier.fillMaxSize()) {
+        CenteredContent(Modifier.fillMaxSize()) {
+            IconBadge(icon = Icons.Default.Place, tint = MaterialTheme.colorScheme.onPrimaryContainer)
+            Spacer(modifier = Modifier.height(24.dp))
+            Text(
+                text = stringResource(R.string.share_idle_title),
+                style = MaterialTheme.typography.titleLarge,
+                textAlign = TextAlign.Center,
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = stringResource(R.string.share_idle_subtitle),
+                style = MaterialTheme.typography.bodyLarge,
+                textAlign = TextAlign.Center,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+
+            if (showApiKeyWarning || missingPermissions.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(24.dp))
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    if (showApiKeyWarning) {
+                        WarningBanner(
+                            message = stringResource(R.string.share_warning_missing_api_key),
+                            actionLabel = stringResource(R.string.share_warning_open_settings),
+                            onActionClick = onOpenSettings,
+                        )
+                    }
+                    missingPermissions.forEach { permissionState ->
+                        WarningBanner(
+                            message = permissionWarningMessage(permissionState.permission),
+                            actionLabel = permissionActionLabel(permissionState.status),
+                            onActionClick = permissionState.requestOrOpenSettings,
+                        )
+                    }
+                }
+            }
+        }
+
+        IconButton(
+            onClick = onOpenSettings,
+            modifier = Modifier.align(Alignment.TopEnd).padding(8.dp),
+        ) {
+            Icon(
+                imageVector = Icons.Default.Settings,
+                contentDescription = stringResource(R.string.share_settings_button),
+            )
+        }
     }
 }
+
+@Composable
+private fun permissionWarningMessage(permission: String): String =
+    when (permission) {
+        Manifest.permission.POST_NOTIFICATIONS -> stringResource(R.string.share_warning_missing_notifications_permission)
+        else -> stringResource(R.string.share_warning_missing_permission_generic)
+    }
+
+@Composable
+private fun permissionActionLabel(status: RuntimePermissionStatus): String =
+    if (status == RuntimePermissionStatus.PERMANENTLY_DENIED) {
+        stringResource(R.string.share_warning_open_app_settings)
+    } else {
+        stringResource(R.string.share_warning_grant_permission)
+    }
 
 @Composable
 private fun ProcessingContent(

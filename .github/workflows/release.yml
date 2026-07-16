@@ -38,14 +38,12 @@ jobs:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-          PLACES_API_KEY: ${{ secrets.PLACES_API_KEY }}
         run: |
           missing=()
           [ -z "$KEYSTORE_BASE64" ] && missing+=("KEYSTORE_BASE64")
           [ -z "$KEYSTORE_PASSWORD" ] && missing+=("KEYSTORE_PASSWORD")
           [ -z "$KEY_ALIAS" ] && missing+=("KEY_ALIAS")
           [ -z "$KEY_PASSWORD" ] && missing+=("KEY_PASSWORD")
-          [ -z "$PLACES_API_KEY" ] && missing+=("PLACES_API_KEY")
           if [ ${#missing[@]} -ne 0 ]; then
             echo "::error::Missing required Action secrets: ${missing[*]}"
             exit 1
@@ -59,14 +57,6 @@ jobs:
 
       - name: Run unit tests
         run: ./gradlew test --console=plain
-
-      # Real Places API key for the release build, so geocoding works at runtime - without this,
-      # the secrets-gradle-plugin would silently fall back to the local.defaults.properties
-      # placeholder (fine for local dev, not for a shipped release). See app/build.gradle.kts.
-      - name: Configure Places API key
-        env:
-          PLACES_API_KEY: ${{ secrets.PLACES_API_KEY }}
-        run: echo "PLACES_API_KEY=$PLACES_API_KEY" > secrets.properties
 
       - name: Decode signing keystore
         env:

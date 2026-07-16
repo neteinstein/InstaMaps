@@ -17,8 +17,10 @@ rootProject.name = "InstaMaps"
 
 include(":core:common")
 include(":core:designsystem")
+include(":core:settings")
 include(":feature:maps")
 include(":feature:geocoding")
 include(":feature:videoprocessing")
 include(":feature:share")
+include(":feature:settings")
 include(":app")
