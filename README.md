@@ -29,7 +29,8 @@ tap it to jump straight into Maps.
 ## Requirements
 
 - Android 8.1+ (API 27) device or emulator.
-- A Google Cloud project with the **Places API (New)** enabled, for geocoding.
+- A Google Places API key (**Places API (New)** enabled on a Google Cloud project) - entered into
+  the app itself at runtime, not needed at build time. See [Setup](#setup).
 
 ## Setup
 
@@ -38,24 +39,21 @@ git clone https://github.com/neteinstein/InstaMaps.git
 cd InstaMaps
 ```
 
-Create a `secrets.properties` file at the repo root (gitignored, never committed) with your own
-Places API key:
-
-```properties
-PLACES_API_KEY=your-real-key-here
-```
-
-Get a key at the [Google Cloud Console](https://console.cloud.google.com/google/maps-apis). Without
-this file, the build falls back to the placeholder in `local.defaults.properties`, so the project
-still compiles on a clean checkout - but Places lookups will fail at runtime until you supply a
-real key.
-
-Then open the project in Android Studio, or build/run from the command line:
+Open the project in Android Studio, or build/run from the command line - no build-time secrets
+file is required, the project compiles on a clean checkout with no extra configuration:
 
 ```bash
 ./gradlew assembleDebug
 ./gradlew installDebug   # with a device/emulator connected
 ```
+
+InstaMaps needs a Google Places API key to geocode anything. Get one at the
+[Google Cloud Console](https://console.cloud.google.com/google/maps-apis) with the
+**Places API (New)** enabled, then open the app, tap the settings icon (top right of the main
+screen), paste the key into the Places API Key field, and tap Save. The key is stored on-device
+with Jetpack DataStore and included in Android's automatic app backup, so it carries over to your
+other devices/a reinstall without re-entering it. Until a key is saved, the main screen shows a
+warning with a shortcut straight to Settings instead of attempting to geocode.
 
 ## Usage
 
@@ -64,6 +62,13 @@ Then open the project in Android Studio, or build/run from the command line:
 3. Watch the in-app progress animation, or background the app - either way, a notification fires
    once the place is found.
 4. Tap the notification (or wait for the in-app auto-open) to land on the pin in Google Maps.
+
+If the Places API key or a required runtime permission is missing, InstaMaps opens to the main
+screen instead of processing the video, showing a warning per missing item with a button to fix
+it (jump to Settings, grant the permission, or open the system app-settings page if it was
+previously denied). Once everything's in place, sharing the same video again - or just waiting,
+since the app also resumes automatically once you fix the last warning if you got there without
+sharing - continues into the normal pipeline.
 
 ## Architecture
 
@@ -79,7 +84,9 @@ it as a GitHub Release tagged `v1.0.<run number>` with auto-generated release no
 is renamed to `InstaMaps_version<version>.apk` (dots replaced with underscores, e.g.
 `InstaMaps_version1_0_42.apk`), and its SHA-1 checksum is prepended to the release notes.
 
-The workflow requires these repository secrets (**Settings → Secrets and variables → Actions**):
+The workflow requires these repository secrets (**Settings → Secrets and variables → Actions**),
+all needed only for signing the release APK - the Places API key is no longer a build-time secret,
+see [Setup](#setup):
 
 | Secret              | Value                                                                                |
 |----------------------|---------------------------------------------------------------------------------------|
@@ -87,9 +94,8 @@ The workflow requires these repository secrets (**Settings → Secrets and varia
 | `KEYSTORE_PASSWORD` | Keystore password                                                                      |
 | `KEY_ALIAS`         | Alias of the signing key inside the keystore                                          |
 | `KEY_PASSWORD`      | Password for that key alias                                                           |
-| `PLACES_API_KEY`    | A real Places API key, so geocoding works in the published release build              |
 
-All five are required - the workflow fails fast with a clear error if any are missing, instead of
+All four are required - the workflow fails fast with a clear error if any are missing, instead of
 publishing an unsigned or non-functional release. Local `./gradlew assembleRelease` builds don't
 need any of this: they fall back to debug signing (see `app/build.gradle.kts`).
 

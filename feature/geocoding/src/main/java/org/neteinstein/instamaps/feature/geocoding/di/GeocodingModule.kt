@@ -1,28 +1,20 @@
 package org.neteinstein.instamaps.feature.geocoding.di
 
-import com.google.android.libraries.places.api.Places
 import org.koin.android.ext.koin.androidContext
-import org.koin.core.module.Module
-import org.koin.core.module.dsl.bind
-import org.koin.core.module.dsl.singleOf
 import org.koin.dsl.module
 import org.neteinstein.instamaps.feature.geocoding.data.PlacesSdkPlaceSearchRepository
 import org.neteinstein.instamaps.feature.geocoding.domain.PlaceSearchRepository
 import org.neteinstein.instamaps.feature.geocoding.domain.SearchPlaceUseCase
 
 /**
- * Built with the Places API key rather than reading `BuildConfig` directly, so this module stays
- * decoupled from `:app`'s build configuration - the composition root (`:app`) supplies the key.
+ * No longer takes a Places API key constructor parameter: [PlacesSdkPlaceSearchRepository] reads
+ * the current key from `core:settings` lazily on every search instead of a Koin-startup
+ * snapshot, so a key saved on the Settings screen takes effect without restarting the app.
  */
-fun geocodingModule(placesApiKey: String): Module =
+val geocodingModule =
     module {
-        single {
-            val context = androidContext()
-            if (!Places.isInitialized()) {
-                Places.initializeWithNewPlacesApiEnabled(context, placesApiKey)
-            }
-            Places.createClient(context)
+        single<PlaceSearchRepository> {
+            PlacesSdkPlaceSearchRepository(context = androidContext(), settingsRepository = get())
         }
-        singleOf(::PlacesSdkPlaceSearchRepository) { bind<PlaceSearchRepository>() }
         factory { SearchPlaceUseCase(get()) }
     }

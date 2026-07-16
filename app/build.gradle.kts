@@ -3,7 +3,6 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ktlint)
-    alias(libs.plugins.secrets)
     // No Kover here: :app is a pure composition root (Application + one trampoline Activity)
     // with no domain/data logic of its own - see the root build.gradle.kts comment for why it's
     // intentionally left out of the merged coverage report.
@@ -27,10 +26,6 @@ android {
 
     buildFeatures {
         compose = true
-        // Required for the secrets-gradle-plugin below: it writes the Places API key via
-        // Variant.buildConfigFields, which AGP rejects at configuration time unless this is on
-        // (AGP 8 defaults buildConfig generation to off).
-        buildConfig = true
     }
 
     // Populated by .github/workflows/release.yml from Action secrets (KEYSTORE_BASE64 decoded to
@@ -78,15 +73,6 @@ kotlin {
     }
 }
 
-// Reads the Places API key from `secrets.properties` (gitignored, developer-local) with
-// `local.defaults.properties` (committed placeholder) as the fallback so a clean checkout still
-// compiles - see app/local.defaults.properties and the README for setup instructions. Generates
-// `BuildConfig.PLACES_API_KEY`.
-secrets {
-    propertiesFileName = "secrets.properties"
-    defaultPropertiesFileName = "local.defaults.properties"
-}
-
 ktlint {
     android.set(true)
     ignoreFailures.set(false)
@@ -99,10 +85,12 @@ ktlint {
 dependencies {
     implementation(project(":core:common"))
     implementation(project(":core:designsystem"))
+    implementation(project(":core:settings"))
     implementation(project(":feature:maps"))
     implementation(project(":feature:geocoding"))
     implementation(project(":feature:videoprocessing"))
     implementation(project(":feature:share"))
+    implementation(project(":feature:settings"))
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)

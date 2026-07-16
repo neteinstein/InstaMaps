@@ -8,11 +8,15 @@ import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.stateIn
+import org.neteinstein.instamaps.core.settings.domain.IsPlacesApiKeyConfiguredUseCase
 import org.neteinstein.instamaps.feature.maps.domain.MapsDestination
 import org.neteinstein.instamaps.feature.share.domain.ParseSharedTextUseCase
 import org.neteinstein.instamaps.feature.share.work.ProcessSharedUrlWorker
@@ -27,9 +31,22 @@ import org.neteinstein.instamaps.feature.share.work.ProcessSharedUrlWorker
 class ShareViewModel(
     private val context: Context,
     private val parseSharedTextUseCase: ParseSharedTextUseCase,
+    private val isPlacesApiKeyConfiguredUseCase: IsPlacesApiKeyConfiguredUseCase,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow<ShareUiState>(ShareUiState.Idle)
     val uiState: StateFlow<ShareUiState> = _uiState.asStateFlow()
+
+    /**
+     * `null` while the first read from Settings is still in flight - kept distinct from `false`
+     * so the main screen doesn't flash a "missing key" warning before the real value loads, and
+     * so a shared video isn't allowed to start processing on that same false premise. Collected
+     * eagerly (not just while the UI observes it) so the value is already current by the time the
+     * user comes back from the Settings screen.
+     */
+    val hasPlacesApiKey: StateFlow<Boolean?> =
+        isPlacesApiKeyConfiguredUseCase()
+            .map { hasKey -> hasKey as Boolean? }
+            .stateIn(viewModelScope, SharingStarted.Eagerly, initialValue = null)
 
     private var observerJob: Job? = null
 

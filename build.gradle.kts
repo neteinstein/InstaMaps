@@ -4,7 +4,6 @@ plugins {
     alias(libs.plugins.kotlin.android) apply false
     alias(libs.plugins.kotlin.compose) apply false
     alias(libs.plugins.ktlint) apply false
-    alias(libs.plugins.secrets) apply false
     // Unlike the plugins above, Kover is genuinely applied here (not `apply false`): the root
     // project acts as Kover's "merging module" that aggregates coverage from every module below
     // into one report, so it needs the plugin active to expose the `kover { }` / `dependencies {
@@ -17,10 +16,12 @@ plugins {
 dependencies {
     kover(project(":core:common"))
     kover(project(":core:designsystem"))
+    kover(project(":core:settings"))
     kover(project(":feature:maps"))
     kover(project(":feature:geocoding"))
     kover(project(":feature:videoprocessing"))
     kover(project(":feature:share"))
+    kover(project(":feature:settings"))
     // :app is intentionally excluded: it is a pure composition root (Application class + a single
     // trampoline Activity wiring Koin/manifest intent-filters together) with no domain/data logic
     // of its own to cover - the same rationale as the `*.di`/`*.presentation`/`*.work` excludes

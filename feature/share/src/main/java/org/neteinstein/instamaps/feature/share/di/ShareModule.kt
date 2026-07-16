@@ -23,5 +23,11 @@ val shareModule =
             )
         }
         single { ShareNotifier(context = androidContext()) }
-        viewModel { ShareViewModel(context = androidContext(), parseSharedTextUseCase = get()) }
+        viewModel {
+            ShareViewModel(
+                context = androidContext(),
+                parseSharedTextUseCase = get(),
+                isPlacesApiKeyConfiguredUseCase = get(),
+            )
+        }
     }

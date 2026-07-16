@@ -7,7 +7,7 @@ plugins {
 }
 
 android {
-    namespace = "org.neteinstein.instamaps.feature.share"
+    namespace = "org.neteinstein.instamaps.feature.settings"
     compileSdk = 36
 
     defaultConfig {
@@ -47,13 +47,8 @@ dependencies {
     implementation(project(":core:common"))
     implementation(project(":core:designsystem"))
     implementation(project(":core:settings"))
-    implementation(project(":feature:videoprocessing"))
-    implementation(project(":feature:geocoding"))
-    implementation(project(":feature:maps"))
 
     implementation(libs.androidx.core.ktx)
-    implementation(libs.androidx.activity.compose)
-    implementation(libs.androidx.work.runtime.ktx)
     implementation(libs.koin.android)
     implementation(libs.koin.androidx.compose)
     implementation(libs.kotlinx.coroutines.android)
@@ -67,7 +62,6 @@ dependencies {
     implementation(libs.compose.ui.tooling.preview)
     implementation(libs.compose.material3)
     implementation(libs.compose.material.icons.core)
-    implementation(libs.compose.animation)
     debugImplementation(libs.compose.ui.tooling)
 
     testImplementation(libs.junit)
