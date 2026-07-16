@@ -20,12 +20,15 @@ import org.neteinstein.instamaps.feature.geocoding.domain.PlaceSearchRepository
 import org.neteinstein.instamaps.feature.geocoding.domain.SearchPlaceUseCase
 import org.neteinstein.instamaps.feature.videoprocessing.domain.DownloadedVideo
 import org.neteinstein.instamaps.feature.videoprocessing.domain.EntityExtractionRepository
+import org.neteinstein.instamaps.feature.videoprocessing.domain.ExtractLocationCandidatesFromDescriptionUseCase
 import org.neteinstein.instamaps.feature.videoprocessing.domain.ExtractLocationCandidatesUseCase
 import org.neteinstein.instamaps.feature.videoprocessing.domain.FrameExtractorRepository
+import org.neteinstein.instamaps.feature.videoprocessing.domain.LocationTextAnalyzer
 import org.neteinstein.instamaps.feature.videoprocessing.domain.LocationTextParser
 import org.neteinstein.instamaps.feature.videoprocessing.domain.TextRecognitionRepository
 import org.neteinstein.instamaps.feature.videoprocessing.domain.VideoDownloadRepository
 import org.neteinstein.instamaps.feature.videoprocessing.domain.VideoFrame
+import org.neteinstein.instamaps.feature.videoprocessing.domain.VideoMetadataRepository
 import java.io.File
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -41,7 +44,12 @@ private class TestDispatcherProvider(
 private class FakeVideoDownloadRepository(
     private val result: Result<DownloadedVideo> = Result.success(DownloadedVideo(File("fake-video.mp4"))),
 ) : VideoDownloadRepository {
-    override suspend fun download(url: String): Result<DownloadedVideo> = result
+    var downloadCalled = false
+
+    override suspend fun download(url: String): Result<DownloadedVideo> {
+        downloadCalled = true
+        return result
+    }
 
     override suspend fun delete(video: DownloadedVideo) = Unit
 }
@@ -65,6 +73,12 @@ private class FakeEntityExtractionRepository : EntityExtractionRepository {
     override suspend fun extractAddresses(text: String): Result<List<String>> = Result.success(emptyList())
 }
 
+private class FakeVideoMetadataRepository(
+    private val result: Result<String> = Result.success(""),
+) : VideoMetadataRepository {
+    override suspend fun fetchDescription(url: String): Result<String> = result
+}
+
 private class FakePlaceSearchRepository(
     private val resultsByQuery: Map<String, Result<List<GeocodedPlace>>>,
 ) : PlaceSearchRepository {
@@ -81,24 +95,32 @@ class ProcessSharedUrlUseCaseTest {
         frameText: String,
         placeResultsByQuery: Map<String, Result<List<GeocodedPlace>>> = emptyMap(),
         videoDownloadResult: Result<DownloadedVideo> = Result.success(DownloadedVideo(File("fake-video.mp4"))),
-    ): Pair<ProcessSharedUrlUseCase, FakePlaceSearchRepository> {
+        descriptionResult: Result<String> = Result.success(""),
+    ): Triple<ProcessSharedUrlUseCase, FakePlaceSearchRepository, FakeVideoDownloadRepository> {
         val bitmap = mock<Bitmap>()
         val placeSearchRepository = FakePlaceSearchRepository(placeResultsByQuery)
+        val videoDownloadRepository = FakeVideoDownloadRepository(videoDownloadResult)
+        val locationTextAnalyzer = LocationTextAnalyzer(FakeEntityExtractionRepository(), LocationTextParser())
+        val extractLocationCandidatesFromDescriptionUseCase =
+            ExtractLocationCandidatesFromDescriptionUseCase(
+                videoMetadataRepository = FakeVideoMetadataRepository(descriptionResult),
+                locationTextAnalyzer = locationTextAnalyzer,
+            )
         val extractLocationCandidatesUseCase =
             ExtractLocationCandidatesUseCase(
-                videoDownloadRepository = FakeVideoDownloadRepository(videoDownloadResult),
+                videoDownloadRepository = videoDownloadRepository,
                 frameExtractorRepository = FakeFrameExtractorRepository(listOf(VideoFrame(0L, bitmap))),
                 textRecognitionRepository = FakeTextRecognitionRepository(mapOf(bitmap to frameText)),
-                entityExtractionRepository = FakeEntityExtractionRepository(),
-                locationTextParser = LocationTextParser(),
+                locationTextAnalyzer = locationTextAnalyzer,
                 dispatcherProvider = TestDispatcherProvider(),
             )
         val useCase =
             ProcessSharedUrlUseCase(
+                extractLocationCandidatesFromDescriptionUseCase = extractLocationCandidatesFromDescriptionUseCase,
                 extractLocationCandidatesUseCase = extractLocationCandidatesUseCase,
                 searchPlaceUseCase = SearchPlaceUseCase(placeSearchRepository),
             )
-        return useCase to placeSearchRepository
+        return Triple(useCase, placeSearchRepository, videoDownloadRepository)
     }
 
     private val samplePlace =
@@ -112,7 +134,7 @@ class ProcessSharedUrlUseCaseTest {
     @Test
     fun `resolves the top-ranked place-name candidate to a Found destination`() =
         runTest {
-            val (useCase, _) =
+            val (useCase, _, _) =
                 useCaseFor(
                     frameText = "📍Central Park",
                     placeResultsByQuery = mapOf("Central Park" to Result.success(listOf(samplePlace))),
@@ -128,7 +150,7 @@ class ProcessSharedUrlUseCaseTest {
     @Test
     fun `resolves a coordinates candidate directly without calling the search repository`() =
         runTest {
-            val (useCase, placeSearchRepository) = useCaseFor(frameText = "Meet me at 48.8566, 2.3522")
+            val (useCase, placeSearchRepository, _) = useCaseFor(frameText = "Meet me at 48.8566, 2.3522")
 
             val progress = useCase("https://instagram.com/reel/abc").toList()
 
@@ -143,7 +165,7 @@ class ProcessSharedUrlUseCaseTest {
         runTest {
             // "📍Warehouse Cafe #CentralPark" yields two candidates: an explicit-marker
             // PlaceName("Warehouse Cafe", 0.9) ranked above a hashtag PlaceName("Central Park", 0.5).
-            val (useCase, placeSearchRepository) =
+            val (useCase, placeSearchRepository, _) =
                 useCaseFor(
                     frameText = "📍Warehouse Cafe #CentralPark",
                     placeResultsByQuery =
@@ -163,7 +185,7 @@ class ProcessSharedUrlUseCaseTest {
     @Test
     fun `emits NotFound without geocoding when no candidate was detected at all`() =
         runTest {
-            val (useCase, placeSearchRepository) = useCaseFor(frameText = "just a nice video, no location here")
+            val (useCase, placeSearchRepository, _) = useCaseFor(frameText = "just a nice video, no location here")
 
             val progress = useCase("https://instagram.com/reel/abc").toList()
 
@@ -175,7 +197,7 @@ class ProcessSharedUrlUseCaseTest {
     @Test
     fun `emits NotFound when every detected candidate fails to resolve`() =
         runTest {
-            val (useCase, _) =
+            val (useCase, _, _) =
                 useCaseFor(
                     frameText = "📍Warehouse Cafe #CentralPark",
                     placeResultsByQuery =
@@ -194,12 +216,16 @@ class ProcessSharedUrlUseCaseTest {
     fun `propagates a download failure as a terminal Failed state`() =
         runTest {
             val error = AppError.Network("boom")
-            val (useCase, _) = useCaseFor(frameText = "", videoDownloadResult = Result.failure(error))
+            val (useCase, _, _) = useCaseFor(frameText = "", videoDownloadResult = Result.failure(error))
 
             val progress = useCase("https://instagram.com/reel/abc").toList()
 
             assertEquals(
-                listOf(ShareProcessingProgress.Downloading, ShareProcessingProgress.Failed(error)),
+                listOf(
+                    ShareProcessingProgress.CheckingDescription,
+                    ShareProcessingProgress.Downloading,
+                    ShareProcessingProgress.Failed(error),
+                ),
                 progress,
             )
         }
@@ -207,11 +233,70 @@ class ProcessSharedUrlUseCaseTest {
     @Test
     fun `maps Downloading and ExtractingFrames progress through unchanged`() =
         runTest {
-            val (useCase, _) = useCaseFor(frameText = "no location signal")
+            val (useCase, _, _) = useCaseFor(frameText = "no location signal")
 
             val progress = useCase("https://instagram.com/reel/abc").toList()
 
-            assertEquals(ShareProcessingProgress.Downloading, progress.first())
+            assertEquals(ShareProcessingProgress.CheckingDescription, progress.first())
+            assertTrue(progress.contains(ShareProcessingProgress.Downloading))
             assertTrue(progress.contains(ShareProcessingProgress.ExtractingFrames))
+        }
+
+    @Test
+    fun `resolves directly from the description without downloading the video`() =
+        runTest {
+            val (useCase, placeSearchRepository, videoDownloadRepository) =
+                useCaseFor(
+                    frameText = "no location signal",
+                    descriptionResult = Result.success("📍Central Park"),
+                    placeResultsByQuery = mapOf("Central Park" to Result.success(listOf(samplePlace))),
+                )
+
+            val progress = useCase("https://instagram.com/reel/abc").toList()
+
+            val found = progress.filterIsInstance<ShareProcessingProgress.Found>().single()
+            assertEquals("Central Park", found.displayName)
+            assertEquals(listOf("Central Park"), placeSearchRepository.receivedQueries)
+            assertFalse(videoDownloadRepository.downloadCalled)
+            assertEquals(ShareProcessingProgress.CheckingDescription, progress.first())
+        }
+
+    @Test
+    fun `falls back to the video pipeline when the description candidate does not resolve`() =
+        runTest {
+            val (useCase, placeSearchRepository, videoDownloadRepository) =
+                useCaseFor(
+                    frameText = "📍Central Park",
+                    descriptionResult = Result.success("📍Warehouse Cafe"),
+                    placeResultsByQuery =
+                        mapOf(
+                            "Warehouse Cafe" to Result.failure(AppError.NotFound("no such place")),
+                            "Central Park" to Result.success(listOf(samplePlace)),
+                        ),
+                )
+
+            val progress = useCase("https://instagram.com/reel/abc").toList()
+
+            val found = progress.filterIsInstance<ShareProcessingProgress.Found>().single()
+            assertEquals("Central Park", found.displayName)
+            assertEquals(listOf("Warehouse Cafe", "Central Park"), placeSearchRepository.receivedQueries)
+            assertTrue(videoDownloadRepository.downloadCalled)
+        }
+
+    @Test
+    fun `falls back to the video pipeline when the description has no location signal`() =
+        runTest {
+            val (useCase, _, videoDownloadRepository) =
+                useCaseFor(
+                    frameText = "📍Central Park",
+                    descriptionResult = Result.success("just a fun day out, no location mentioned"),
+                    placeResultsByQuery = mapOf("Central Park" to Result.success(listOf(samplePlace))),
+                )
+
+            val progress = useCase("https://instagram.com/reel/abc").toList()
+
+            val found = progress.filterIsInstance<ShareProcessingProgress.Found>().single()
+            assertEquals("Central Park", found.displayName)
+            assertTrue(videoDownloadRepository.downloadCalled)
         }
 }

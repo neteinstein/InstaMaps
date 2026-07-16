@@ -455,6 +455,7 @@ private fun CenteredContent(
 @Composable
 private fun stageLabel(stage: ProcessingStage): String =
     when (stage) {
+        ProcessingStage.CHECKING_DESCRIPTION -> stringResource(R.string.share_stage_checking_description)
         ProcessingStage.DOWNLOADING -> stringResource(R.string.share_stage_downloading)
         ProcessingStage.EXTRACTING_FRAMES -> stringResource(R.string.share_stage_extracting_frames)
         ProcessingStage.ANALYZING_FRAME -> stringResource(R.string.share_stage_analyzing_frame)

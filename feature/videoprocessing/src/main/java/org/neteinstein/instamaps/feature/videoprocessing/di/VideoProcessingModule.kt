@@ -12,12 +12,16 @@ import org.neteinstein.instamaps.feature.videoprocessing.data.MediaMetadataRetri
 import org.neteinstein.instamaps.feature.videoprocessing.data.MlKitEntityExtractionRepository
 import org.neteinstein.instamaps.feature.videoprocessing.data.MlKitTextRecognitionRepository
 import org.neteinstein.instamaps.feature.videoprocessing.data.YtDlpVideoDownloadRepository
+import org.neteinstein.instamaps.feature.videoprocessing.data.YtDlpVideoMetadataRepository
 import org.neteinstein.instamaps.feature.videoprocessing.domain.EntityExtractionRepository
+import org.neteinstein.instamaps.feature.videoprocessing.domain.ExtractLocationCandidatesFromDescriptionUseCase
 import org.neteinstein.instamaps.feature.videoprocessing.domain.ExtractLocationCandidatesUseCase
 import org.neteinstein.instamaps.feature.videoprocessing.domain.FrameExtractorRepository
+import org.neteinstein.instamaps.feature.videoprocessing.domain.LocationTextAnalyzer
 import org.neteinstein.instamaps.feature.videoprocessing.domain.LocationTextParser
 import org.neteinstein.instamaps.feature.videoprocessing.domain.TextRecognitionRepository
 import org.neteinstein.instamaps.feature.videoprocessing.domain.VideoDownloadRepository
+import org.neteinstein.instamaps.feature.videoprocessing.domain.VideoMetadataRepository
 
 val videoProcessingModule =
     module {
@@ -30,19 +34,28 @@ val videoProcessingModule =
         single<VideoDownloadRepository> {
             YtDlpVideoDownloadRepository(context = androidContext(), dispatcherProvider = get())
         }
+        single<VideoMetadataRepository> {
+            YtDlpVideoMetadataRepository(context = androidContext(), dispatcherProvider = get())
+        }
         singleOf(::MediaMetadataRetrieverFrameExtractor) { bind<FrameExtractorRepository>() }
         singleOf(::MlKitTextRecognitionRepository) { bind<TextRecognitionRepository>() }
         singleOf(::MlKitEntityExtractionRepository) { bind<EntityExtractionRepository>() }
 
         factory { LocationTextParser() }
+        factory { LocationTextAnalyzer(entityExtractionRepository = get(), locationTextParser = get()) }
         factory {
             ExtractLocationCandidatesUseCase(
                 videoDownloadRepository = get(),
                 frameExtractorRepository = get(),
                 textRecognitionRepository = get(),
-                entityExtractionRepository = get(),
-                locationTextParser = get(),
+                locationTextAnalyzer = get(),
                 dispatcherProvider = get(),
+            )
+        }
+        factory {
+            ExtractLocationCandidatesFromDescriptionUseCase(
+                videoMetadataRepository = get(),
+                locationTextAnalyzer = get(),
             )
         }
     }

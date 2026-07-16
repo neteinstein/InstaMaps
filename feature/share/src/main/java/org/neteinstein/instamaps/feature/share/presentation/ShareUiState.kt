@@ -24,6 +24,7 @@ sealed class ShareUiState {
 }
 
 enum class ProcessingStage {
+    CHECKING_DESCRIPTION,
     DOWNLOADING,
     EXTRACTING_FRAMES,
     ANALYZING_FRAME,

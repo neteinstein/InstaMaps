@@ -14,21 +14,22 @@ import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * Downloads a shared video, then extracts location candidates from it, reporting progress as it
- * goes. This is `feature:share`'s only source of location candidates - see
- * `ProcessSharedUrlUseCase`, which runs this and then resolves the ranked candidates it emits.
+ * goes. This is `feature:share`'s fallback source of location candidates, tried only when
+ * [ExtractLocationCandidatesFromDescriptionUseCase]'s much cheaper caption/description check comes
+ * up empty - see `ProcessSharedUrlUseCase`, which runs that first, then this, resolving whichever
+ * one's ranked candidates actually yields a real place.
  *
  * Implements the producer/consumer pipeline from the perf brief: a single producer coroutine
  * pulls frames out of [frameExtractorRepository] and pushes them onto a [Channel], while
  * [ocrConcurrency] consumer coroutines pull frames off that channel concurrently and run
- * OCR + entity extraction + text parsing on them. The extractor never blocks waiting for a frame's
- * analysis to finish before grabbing the next one.
+ * OCR + [locationTextAnalyzer] on them. The extractor never blocks waiting for a frame's analysis
+ * to finish before grabbing the next one.
  */
 class ExtractLocationCandidatesUseCase(
     private val videoDownloadRepository: VideoDownloadRepository,
     private val frameExtractorRepository: FrameExtractorRepository,
     private val textRecognitionRepository: TextRecognitionRepository,
-    private val entityExtractionRepository: EntityExtractionRepository,
-    private val locationTextParser: LocationTextParser,
+    private val locationTextAnalyzer: LocationTextAnalyzer,
     private val dispatcherProvider: DispatcherProvider,
     private val ocrConcurrency: Int = DEFAULT_OCR_CONCURRENCY,
 ) {
@@ -85,19 +86,12 @@ class ExtractLocationCandidatesUseCase(
     private suspend fun analyzeFrame(frame: VideoFrame): List<LocationCandidate> =
         try {
             val text = textRecognitionRepository.recognizeText(frame.bitmap).getOrNull().orEmpty()
-            if (text.isBlank()) {
-                emptyList()
-            } else {
-                val addresses = entityExtractionRepository.extractAddresses(text).getOrNull().orEmpty()
-                val addressCandidates = addresses.map { LocationCandidate.PlaceName(text = it, confidence = ADDRESS_CONFIDENCE) }
-                locationTextParser.parse(text) + addressCandidates
-            }
+            locationTextAnalyzer.analyze(text)
         } finally {
             frame.bitmap.recycle()
         }
 
     private companion object {
         const val DEFAULT_OCR_CONCURRENCY = 3
-        const val ADDRESS_CONFIDENCE = 0.85f
     }
 }

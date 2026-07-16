@@ -57,7 +57,7 @@ class ShareViewModel(
             return
         }
 
-        _uiState.value = ShareUiState.Processing(ProcessingStage.DOWNLOADING)
+        _uiState.value = ShareUiState.Processing(ProcessingStage.CHECKING_DESCRIPTION)
         val request = ProcessSharedUrlWorker.enqueue(context, parsed.url)
 
         // A new share always wins over whatever the UI was showing for a previous one - each
@@ -83,10 +83,11 @@ class ShareViewModel(
 
     private fun Data.toProcessingStage(): ProcessingStage =
         when (getString(ProcessSharedUrlWorker.KEY_STAGE)) {
+            ProcessSharedUrlWorker.STAGE_DOWNLOADING -> ProcessingStage.DOWNLOADING
             ProcessSharedUrlWorker.STAGE_EXTRACTING_FRAMES -> ProcessingStage.EXTRACTING_FRAMES
             ProcessSharedUrlWorker.STAGE_ANALYZING_FRAME -> ProcessingStage.ANALYZING_FRAME
             ProcessSharedUrlWorker.STAGE_GEOCODING -> ProcessingStage.GEOCODING
-            else -> ProcessingStage.DOWNLOADING
+            else -> ProcessingStage.CHECKING_DESCRIPTION
         }
 
     private fun Data.toFoundUiState(): ShareUiState {

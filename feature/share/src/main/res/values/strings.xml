@@ -9,6 +9,7 @@
     <string name="share_idle_title">Share a video to find its location</string>
     <string name="share_idle_subtitle">Share an Instagram or TikTok video with InstaMaps and we\'ll find where it was filmed.</string>
 
+    <string name="share_stage_checking_description">Checking the caption…</string>
     <string name="share_stage_downloading">Downloading video…</string>
     <string name="share_stage_extracting_frames">Extracting frames…</string>
     <string name="share_stage_analyzing_frame">Reading on-screen text…</string>

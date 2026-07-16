@@ -40,7 +40,7 @@ class ProcessSharedUrlWorker(
         setForeground(getForegroundInfo())
 
         return try {
-            var latestProgress: ShareProcessingProgress = ShareProcessingProgress.Downloading
+            var latestProgress: ShareProcessingProgress = ShareProcessingProgress.CheckingDescription
             processSharedUrlUseCase(url).collect { progress ->
                 latestProgress = progress
                 setProgress(progress.toWorkData())
@@ -101,6 +101,7 @@ class ProcessSharedUrlWorker(
         const val KEY_PLACE_ID = "place_id"
         const val KEY_DISPLAY_NAME = "display_name"
 
+        const val STAGE_CHECKING_DESCRIPTION = "CHECKING_DESCRIPTION"
         const val STAGE_DOWNLOADING = "DOWNLOADING"
         const val STAGE_EXTRACTING_FRAMES = "EXTRACTING_FRAMES"
         const val STAGE_ANALYZING_FRAME = "ANALYZING_FRAME"
@@ -131,6 +132,8 @@ class ProcessSharedUrlWorker(
 
 private fun ShareProcessingProgress.toWorkData(): Data =
     when (this) {
+        is ShareProcessingProgress.CheckingDescription ->
+            workDataOf(ProcessSharedUrlWorker.KEY_STAGE to ProcessSharedUrlWorker.STAGE_CHECKING_DESCRIPTION)
         is ShareProcessingProgress.Downloading ->
             workDataOf(ProcessSharedUrlWorker.KEY_STAGE to ProcessSharedUrlWorker.STAGE_DOWNLOADING)
         is ShareProcessingProgress.ExtractingFrames ->

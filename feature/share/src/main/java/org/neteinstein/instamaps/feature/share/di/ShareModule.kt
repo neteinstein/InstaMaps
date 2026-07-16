@@ -18,6 +18,7 @@ val shareModule =
         factory { ParseSharedTextUseCase() }
         factory {
             ProcessSharedUrlUseCase(
+                extractLocationCandidatesFromDescriptionUseCase = get(),
                 extractLocationCandidatesUseCase = get(),
                 searchPlaceUseCase = get(),
             )
