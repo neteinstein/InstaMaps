@@ -1,30 +1,32 @@
 plugins {
-    id("com.android.application")
-    id("org.jetbrains.kotlin.android")
-    id("org.jlleitschuh.gradle.ktlint")
+    alias(libs.plugins.android.application)
+    alias(libs.plugins.kotlin.android)
+    alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.ktlint)
+    alias(libs.plugins.secrets)
+    // No Kover here: :app is a pure composition root (Application + one trampoline Activity)
+    // with no domain/data logic of its own - see the root build.gradle.kts comment for why it's
+    // intentionally left out of the merged coverage report.
 }
 
 android {
     namespace = "org.neteinstein.instamaps"
-    compileSdk = 34
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "org.neteinstein.instamaps"
-        minSdk = 26
-        targetSdk = 34
+        minSdk = 27
+        targetSdk = 36
         versionCode = 1
         versionName = "1.0"
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
-    buildTypes {
-        getByName("release") {
-            isMinifyEnabled = false
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
-            )
-        }
+    buildFeatures {
+        compose = true
+        // Required for the secrets-gradle-plugin below: it writes the Places API key via
+        // Variant.buildConfigFields, which AGP rejects at configuration time unless this is on
+        // (AGP 8 defaults buildConfig generation to off).
+        buildConfig = true
     }
 
     compileOptions {
@@ -32,22 +34,24 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    kotlinOptions {
-        jvmTarget = "17"
-    }
-
-    buildFeatures {
-        viewBinding = true
-    }
-
     testOptions {
-        unitTests {
-            isIncludeAndroidResources = true
-            all {
-                it.jvmArgs("-noverify")
-            }
-        }
+        unitTests.isReturnDefaultValues = true
     }
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+    }
+}
+
+// Reads the Places API key from `secrets.properties` (gitignored, developer-local) with
+// `local.defaults.properties` (committed placeholder) as the fallback so a clean checkout still
+// compiles - see app/local.defaults.properties and the README for setup instructions. Generates
+// `BuildConfig.PLACES_API_KEY`.
+secrets {
+    propertiesFileName = "secrets.properties"
+    defaultPropertiesFileName = "local.defaults.properties"
 }
 
 ktlint {
@@ -60,30 +64,24 @@ ktlint {
 }
 
 dependencies {
-    // AndroidX
-    implementation("androidx.core:core-ktx:1.12.0")
-    implementation("androidx.appcompat:appcompat:1.6.1")
-    implementation("com.google.android.material:material:1.11.0")
-    implementation("androidx.constraintlayout:constraintlayout:2.1.4")
-    implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.7.0")
-    implementation("androidx.lifecycle:lifecycle-livedata-ktx:2.7.0")
-    implementation("androidx.activity:activity-ktx:1.8.2")
+    implementation(project(":core:common"))
+    implementation(project(":core:designsystem"))
+    implementation(project(":feature:maps"))
+    implementation(project(":feature:geocoding"))
+    implementation(project(":feature:videoprocessing"))
+    implementation(project(":feature:share"))
 
-    // Networking
-    implementation("com.squareup.retrofit2:retrofit:2.9.0")
-    implementation("com.squareup.retrofit2:converter-gson:2.9.0")
-    implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
+    implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.activity.compose)
 
-    // Coroutines
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
+    implementation(libs.koin.android)
 
-    // Testing
-    testImplementation("junit:junit:4.13.2")
-    testImplementation("org.mockito.kotlin:mockito-kotlin:5.2.1")
-    testImplementation("org.mockito:mockito-core:5.8.0")
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
-    testImplementation("androidx.arch.core:core-testing:2.2.0")
-    androidTestImplementation("androidx.test.ext:junit:1.1.5")
-    androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")
+    implementation(platform(libs.compose.bom))
+    implementation(libs.compose.ui)
+    implementation(libs.compose.ui.graphics)
+    implementation(libs.compose.ui.tooling.preview)
+    implementation(libs.compose.material3)
+    debugImplementation(libs.compose.ui.tooling)
+
+    testImplementation(libs.junit)
 }
-
