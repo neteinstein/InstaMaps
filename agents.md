@@ -162,3 +162,14 @@ significant enough to warrant a docs update, err on the side of updating.
 | `coverage` | `./gradlew koverXmlReport koverHtmlReport` (uploads the merged report, posts a coverage % job summary) | No (report-only for now, see Testing Standards) |
 
 A PR can only be merged once `lint`, `compile`, and `test` pass.
+
+`.github/workflows/release.yml` runs on every push to `main` (i.e. every merged PR) and on manual
+`workflow_dispatch`. It re-runs `ktlintCheck` and `test` against the exact commit landing on
+`main` - necessary because squash/rebase merges produce a commit that PR Checks never directly
+built - then builds a release APK signed with a keystore decoded from the `KEYSTORE_BASE64` /
+`KEYSTORE_PASSWORD` / `KEY_ALIAS` / `KEY_PASSWORD` secrets and a real `PLACES_API_KEY` secret, and
+publishes it as a GitHub Release tagged `v1.0.<run number>`. `versionCode`/`versionName` are
+overridden at build time via `APP_VERSION_CODE`/`APP_VERSION_NAME` env vars derived from the run
+number (see the `signingConfigs`/`defaultConfig` blocks in `app/build.gradle.kts`). All five
+secrets are required; the workflow fails fast if any are missing rather than shipping an
+unsigned or non-functional build.
