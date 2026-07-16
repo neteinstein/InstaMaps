@@ -71,6 +71,26 @@ Kotlin, Jetpack Compose, MVVM, Coroutines, Koin DI, one Gradle module per featur
 Architecture layering (`domain`/`data`/`presentation`/`di`) within each module. See
 [`agents.md`](agents.md) for the full module map, tech stack, and development/testing standards.
 
+## Releases
+
+Every push to `main` (i.e. every merged PR) triggers `.github/workflows/release.yml`: it
+re-validates the merged commit (`ktlintCheck`, `test`), builds a signed release APK, and publishes
+it as a GitHub Release tagged `v1.0.<run number>` with auto-generated release notes.
+
+The workflow requires these repository secrets (**Settings → Secrets and variables → Actions**):
+
+| Secret              | Value                                                                                |
+|----------------------|---------------------------------------------------------------------------------------|
+| `KEYSTORE_BASE64`   | Your signing keystore, base64-encoded (e.g. `base64 -i release.keystore \| pbcopy`)    |
+| `KEYSTORE_PASSWORD` | Keystore password                                                                      |
+| `KEY_ALIAS`         | Alias of the signing key inside the keystore                                          |
+| `KEY_PASSWORD`      | Password for that key alias                                                           |
+| `PLACES_API_KEY`    | A real Places API key, so geocoding works in the published release build              |
+
+All five are required - the workflow fails fast with a clear error if any are missing, instead of
+publishing an unsigned or non-functional release. Local `./gradlew assembleRelease` builds don't
+need any of this: they fall back to debug signing (see `app/build.gradle.kts`).
+
 ## Contributing
 
 Issues and pull requests are welcome. See [`agents.md`](agents.md) for coding standards, and the
