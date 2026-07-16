@@ -6,9 +6,13 @@ on:
       - main
       - master
 
+concurrency:
+  group: pr-checks-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 jobs:
-  lint_and_test:
-    name: Lint and Unit Tests
+  lint:
+    name: ktlint
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -28,14 +32,118 @@ jobs:
         run: chmod +x gradlew
 
       - name: Run ktlint
-        run: ./gradlew ktlintCheck
+        run: ./gradlew ktlintCheck --console=plain
+
+  compile:
+    name: Compile
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      # Compile-only check, independent of running tests. Compiles main and test source sets for
+      # every module's debug variant so a broken build fails fast without waiting on the (usually
+      # slower) test suite.
+      - name: Compile main and test sources
+        run: ./gradlew compileDebugKotlin compileDebugUnitTestKotlin --console=plain
+
+  test:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
 
       - name: Run unit tests
-        run: ./gradlew test
+        run: ./gradlew test --console=plain
 
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: test-results
-          path: app/build/reports/tests/
+          path: |
+            **/build/reports/tests/
+            **/build/test-results/
+
+  coverage:
+    name: Coverage
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      # Runs its own tests rather than depending on the `test` job's output: keeping jobs fully
+      # independent is what lets them run in parallel on separate runners instead of serializing
+      # behind a `needs:` dependency.
+      - name: Generate merged coverage report
+        run: ./gradlew koverXmlReport koverHtmlReport --console=plain
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: build/reports/kover/
+
+      - name: Coverage summary
+        if: always()
+        run: |
+          REPORT=build/reports/kover/report.xml
+          if [ -f "$REPORT" ]; then
+            LINE_COUNTER=$(grep -o '<counter type="LINE" missed="[0-9]*" covered="[0-9]*"/>' "$REPORT" | tail -1)
+            MISSED=$(echo "$LINE_COUNTER" | grep -o 'missed="[0-9]*"' | grep -o '[0-9]*')
+            COVERED=$(echo "$LINE_COUNTER" | grep -o 'covered="[0-9]*"' | grep -o '[0-9]*')
+            TOTAL=$((MISSED + COVERED))
+            if [ "$TOTAL" -gt 0 ]; then
+              PCT=$(awk "BEGIN { printf \"%.1f\", ($COVERED / $TOTAL) * 100 }")
+            else
+              PCT="0.0"
+            fi
+            {
+              echo "### Line Coverage: ${PCT}%"
+              echo ""
+              echo "Covered $COVERED / $TOTAL lines. \`di\` packages and \`core:designsystem\` are excluded (see root \`build.gradle.kts\`)."
+              echo ""
+              echo "Full HTML report uploaded as the \`coverage-report\` artifact."
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
