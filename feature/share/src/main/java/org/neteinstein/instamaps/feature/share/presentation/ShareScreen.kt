@@ -29,6 +29,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
@@ -232,7 +233,10 @@ private fun IdleContent(
 
         IconButton(
             onClick = onOpenSettings,
-            modifier = Modifier.align(Alignment.TopEnd).padding(8.dp),
+            // statusBarsPadding() first: MainActivity's enableEdgeToEdge() draws this Box behind
+            // the status bar, so without it the button (and its clip/ripple target) would sit
+            // under the status bar/clock instead of just below it.
+            modifier = Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(8.dp),
         ) {
             Icon(
                 imageVector = Icons.Default.Settings,
