@@ -54,12 +54,6 @@ private class FakeTextRecognitionRepository(
     override suspend fun recognizeText(bitmap: Bitmap): Result<String> = Result.success(textByBitmap[bitmap].orEmpty())
 }
 
-private class FakeEntityExtractionRepository(
-    private val addresses: List<String> = emptyList(),
-) : EntityExtractionRepository {
-    override suspend fun extractAddresses(text: String): Result<List<String>> = Result.success(addresses)
-}
-
 class ExtractLocationCandidatesUseCaseTest {
     @Test
     fun `emits Downloading then ExtractingFrames then a Completed with ranked candidates`() =
@@ -71,8 +65,7 @@ class ExtractLocationCandidatesUseCaseTest {
                     videoDownloadRepository = FakeVideoDownloadRepository(),
                     frameExtractorRepository = FakeFrameExtractorRepository(listOf(frame)),
                     textRecognitionRepository = FakeTextRecognitionRepository(mapOf(bitmap to "📍 Eiffel Tower, Paris")),
-                    entityExtractionRepository = FakeEntityExtractionRepository(),
-                    locationTextParser = LocationTextParser(),
+                    locationTextAnalyzer = LocationTextAnalyzer(FakeEntityExtractionRepository(), LocationTextParser()),
                     dispatcherProvider = TestDispatcherProvider(),
                 )
 
@@ -95,8 +88,11 @@ class ExtractLocationCandidatesUseCaseTest {
                     videoDownloadRepository = FakeVideoDownloadRepository(),
                     frameExtractorRepository = FakeFrameExtractorRepository(listOf(frame)),
                     textRecognitionRepository = FakeTextRecognitionRepository(mapOf(bitmap to "some storefront sign")),
-                    entityExtractionRepository = FakeEntityExtractionRepository(listOf("221B Baker Street, London")),
-                    locationTextParser = LocationTextParser(),
+                    locationTextAnalyzer =
+                        LocationTextAnalyzer(
+                            FakeEntityExtractionRepository(listOf("221B Baker Street, London")),
+                            LocationTextParser(),
+                        ),
                     dispatcherProvider = TestDispatcherProvider(),
                 )
 
@@ -116,8 +112,7 @@ class ExtractLocationCandidatesUseCaseTest {
                     videoDownloadRepository = FakeVideoDownloadRepository(),
                     frameExtractorRepository = FakeFrameExtractorRepository(listOf(VideoFrame(0L, bitmap))),
                     textRecognitionRepository = FakeTextRecognitionRepository(emptyMap()),
-                    entityExtractionRepository = FakeEntityExtractionRepository(),
-                    locationTextParser = LocationTextParser(),
+                    locationTextAnalyzer = LocationTextAnalyzer(FakeEntityExtractionRepository(), LocationTextParser()),
                     dispatcherProvider = TestDispatcherProvider(),
                 )
 
@@ -135,8 +130,7 @@ class ExtractLocationCandidatesUseCaseTest {
                     videoDownloadRepository = repository,
                     frameExtractorRepository = FakeFrameExtractorRepository(emptyList()),
                     textRecognitionRepository = FakeTextRecognitionRepository(emptyMap()),
-                    entityExtractionRepository = FakeEntityExtractionRepository(),
-                    locationTextParser = LocationTextParser(),
+                    locationTextAnalyzer = LocationTextAnalyzer(FakeEntityExtractionRepository(), LocationTextParser()),
                     dispatcherProvider = TestDispatcherProvider(),
                 )
 
@@ -154,8 +148,7 @@ class ExtractLocationCandidatesUseCaseTest {
                     videoDownloadRepository = FakeVideoDownloadRepository(Result.failure(error)),
                     frameExtractorRepository = FakeFrameExtractorRepository(emptyList()),
                     textRecognitionRepository = FakeTextRecognitionRepository(emptyMap()),
-                    entityExtractionRepository = FakeEntityExtractionRepository(),
-                    locationTextParser = LocationTextParser(),
+                    locationTextAnalyzer = LocationTextAnalyzer(FakeEntityExtractionRepository(), LocationTextParser()),
                     dispatcherProvider = TestDispatcherProvider(),
                 )
 
@@ -173,8 +166,7 @@ class ExtractLocationCandidatesUseCaseTest {
                     videoDownloadRepository = FakeVideoDownloadRepository(),
                     frameExtractorRepository = FakeFrameExtractorRepository(listOf(VideoFrame(0L, bitmap))),
                     textRecognitionRepository = FakeTextRecognitionRepository(emptyMap()),
-                    entityExtractionRepository = FakeEntityExtractionRepository(),
-                    locationTextParser = LocationTextParser(),
+                    locationTextAnalyzer = LocationTextAnalyzer(FakeEntityExtractionRepository(), LocationTextParser()),
                     dispatcherProvider = TestDispatcherProvider(),
                 )
 

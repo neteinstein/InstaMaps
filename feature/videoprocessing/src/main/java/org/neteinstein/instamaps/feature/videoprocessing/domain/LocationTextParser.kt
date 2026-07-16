@@ -3,13 +3,15 @@ package org.neteinstein.instamaps.feature.videoprocessing.domain
 import org.neteinstein.instamaps.core.common.LatLng
 
 /**
- * Pure regex-based text parser run against OCR'd on-screen text from [ExtractLocationCandidatesUseCase]'s
- * video frames - the only source of location text this app uses (see `feature:share`'s
- * `ProcessSharedUrlUseCase` for how the ranked candidates it returns get resolved to a real place).
- * Ported/generalized from the original single-module app's caption parser, extended to return
- * every signal found (ranked by [LocationCandidate.confidence]) instead of only the first match,
- * since the video pipeline gathers text from many frames and wants to try the best-ranked
- * candidate first rather than committing to whichever pattern happened to run first.
+ * Pure regex-based text parser run against any block of location-adjacent text this app gathers -
+ * a video's caption/description (see [ExtractLocationCandidatesFromDescriptionUseCase]) or OCR'd
+ * on-screen text from [ExtractLocationCandidatesUseCase]'s video frames - via the shared
+ * [LocationTextAnalyzer] (see `feature:share`'s `ProcessSharedUrlUseCase` for how the ranked
+ * candidates either source produces get resolved to a real place). Ported/generalized from the
+ * original single-module app's caption parser, extended to return every signal found (ranked by
+ * [LocationCandidate.confidence]) instead of only the first match, since callers gather text from
+ * multiple sources/frames and want to try the best-ranked candidate first rather than committing
+ * to whichever pattern happened to run first.
  *
  * Tries, in order of how unambiguous the signal is:
  * 1. An explicit marker (`Location:`, `loc:`, `place:`, `at:`, `in:`, 📍, 🗺️).

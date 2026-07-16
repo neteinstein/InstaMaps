@@ -9,6 +9,8 @@ import org.neteinstein.instamaps.feature.maps.domain.MapsDestination
  * search - instead of switching state shapes partway through.
  */
 sealed class ShareProcessingProgress {
+    data object CheckingDescription : ShareProcessingProgress()
+
     data object Downloading : ShareProcessingProgress()
 
     data object ExtractingFrames : ShareProcessingProgress()

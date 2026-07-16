@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
@@ -45,6 +46,20 @@
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </activity>
+
+        <!-- WorkManager's own manifest declares this service with no foregroundServiceType, so
+             the merged manifest defaults to none - ProcessSharedUrlWorker's setForeground() call
+             (see ShareNotifier.buildProcessingForegroundInfo, which requests
+             FOREGROUND_SERVICE_TYPE_DATA_SYNC) then crashes on Android 14+ with
+             "foregroundServiceType ... is not a subset of foregroundServiceType attribute
+             0x00000000 in service element of manifest file". Overriding it here with a matching
+             type (tools:node="merge" to combine with, not replace, WorkManager's own attributes)
+             is the fix documented at
+             https://developer.android.com/develop/background-work/background-tasks/persistent/how-to/long-running#foreground-service-types. -->
+        <service
+            android:name="androidx.work.impl.foreground.SystemForegroundService"
+            android:foregroundServiceType="dataSync"
+            tools:node="merge" />
 
     </application>
 </manifest>
