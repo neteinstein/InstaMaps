@@ -75,7 +75,9 @@ Architecture layering (`domain`/`data`/`presentation`/`di`) within each module. 
 
 Every push to `main` (i.e. every merged PR) triggers `.github/workflows/release.yml`: it
 re-validates the merged commit (`ktlintCheck`, `test`), builds a signed release APK, and publishes
-it as a GitHub Release tagged `v1.0.<run number>` with auto-generated release notes.
+it as a GitHub Release tagged `v1.0.<run number>` with auto-generated release notes. The APK asset
+is renamed to `InstaMaps_version<version>.apk` (dots replaced with underscores, e.g.
+`InstaMaps_version1_0_42.apk`), and its SHA-1 checksum is prepended to the release notes.
 
 The workflow requires these repository secrets (**Settings → Secrets and variables → Actions**):
 
