@@ -83,12 +83,29 @@ jobs:
           APP_VERSION_NAME: "1.0.${{ github.run_number }}"
         run: ./gradlew assembleRelease --console=plain
 
+      # Renames the build output to the release-facing artifact name and computes its SHA-1 so
+      # both can be surfaced consistently (asset name + release notes) in the next step.
+      - name: Prepare release artifact
+        id: artifact
+        env:
+          VERSION_NAME: "1.0.${{ github.run_number }}"
+        run: |
+          VERSION_UNDERSCORE="${VERSION_NAME//./_}"
+          APK_PATH="app/build/outputs/apk/release/InstaMaps_version${VERSION_UNDERSCORE}.apk"
+          mv app/build/outputs/apk/release/app-release.apk "$APK_PATH"
+          SHA1=$(sha1sum "$APK_PATH" | awk '{print $1}')
+          echo "apk_path=$APK_PATH" >> "$GITHUB_OUTPUT"
+          echo "sha1=$SHA1" >> "$GITHUB_OUTPUT"
+
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION_NAME: "1.0.${{ github.run_number }}"
+          APK_PATH: ${{ steps.artifact.outputs.apk_path }}
+          SHA1: ${{ steps.artifact.outputs.sha1 }}
         run: |
           gh release create "v${VERSION_NAME}" \
-            app/build/outputs/apk/release/app-release.apk \
+            "$APK_PATH" \
             --title "v${VERSION_NAME}" \
+            --notes "**SHA-1:** \`${SHA1}\`" \
             --generate-notes
