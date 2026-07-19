@@ -11,6 +11,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.tasks.await
 import org.neteinstein.instamaps.core.common.AppError
 import org.neteinstein.instamaps.core.common.LatLng
+import org.neteinstein.instamaps.core.common.describeOrDefault
 import org.neteinstein.instamaps.core.common.safeCall
 import org.neteinstein.instamaps.core.settings.domain.AppSettingsRepository
 import org.neteinstein.instamaps.feature.geocoding.domain.GeocodedPlace
@@ -43,7 +44,7 @@ class PlacesSdkPlaceSearchRepository(
         }
 
         val client = clientFor(apiKey)
-        return safeCall(mapError = { AppError.Network("Places search failed", it) }) {
+        return safeCall(mapError = { AppError.Network(it.describeOrDefault("Places search failed"), it) }) {
             val request =
                 searchByTextRequest(
                     textQuery = query,

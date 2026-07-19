@@ -5,6 +5,7 @@ import com.google.mlkit.nl.entityextraction.EntityExtractionParams
 import com.google.mlkit.nl.entityextraction.EntityExtractor
 import kotlinx.coroutines.tasks.await
 import org.neteinstein.instamaps.core.common.AppError
+import org.neteinstein.instamaps.core.common.describeOrDefault
 import org.neteinstein.instamaps.core.common.safeCall
 import org.neteinstein.instamaps.feature.videoprocessing.domain.EntityExtractionRepository
 
@@ -21,7 +22,7 @@ class MlKitEntityExtractionRepository(
     private val entityExtractor: EntityExtractor,
 ) : EntityExtractionRepository {
     override suspend fun extractAddresses(text: String): Result<List<String>> =
-        safeCall(mapError = { AppError.PlatformUnavailable("Entity extraction failed", it) }) {
+        safeCall(mapError = { AppError.PlatformUnavailable(it.describeOrDefault("Entity extraction failed"), it) }) {
             if (text.isBlank()) {
                 emptyList()
             } else {

@@ -1,5 +1,6 @@
 package org.neteinstein.instamaps.feature.videoprocessing.domain
 
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -11,6 +12,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.neteinstein.instamaps.core.common.DispatcherProvider
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicReference
 
 /**
  * Downloads a shared video, then extracts location candidates from it, reporting progress as it
@@ -49,6 +51,7 @@ class ExtractLocationCandidatesUseCase(
                 val candidates = mutableListOf<LocationCandidate>()
                 val candidatesMutex = Mutex()
                 val analyzedFrameCount = AtomicInteger(0)
+                val frameExtractionFailure = AtomicReference<Throwable?>(null)
 
                 val producer =
                     launch(dispatcherProvider.io) {
@@ -56,6 +59,15 @@ class ExtractLocationCandidatesUseCase(
                             frameExtractorRepository.extractFrames(video).collect { frame ->
                                 frameChannel.send(frame)
                             }
+                        } catch (cancellation: CancellationException) {
+                            throw cancellation
+                        } catch (throwable: Throwable) {
+                            // A raw extractor failure (e.g. MediaMetadataRetriever choking on a
+                            // corrupt/incompatible file) must not escape uncaught here: an
+                            // exception thrown from this launch child would otherwise cancel the
+                            // whole channelFlow instead of surfacing as a reportable
+                            // VideoAnalysisProgress.Failed, unlike the download step above.
+                            frameExtractionFailure.set(throwable)
                         } finally {
                             frameChannel.close()
                         }
@@ -74,6 +86,12 @@ class ExtractLocationCandidatesUseCase(
 
                 producer.join()
                 consumers.joinAll()
+
+                val extractionFailure = frameExtractionFailure.get()
+                if (extractionFailure != null) {
+                    send(VideoAnalysisProgress.Failed(extractionFailure))
+                    return@channelFlow
+                }
 
                 send(VideoAnalysisProgress.Completed(candidates.sortedByDescending { it.confidence }))
             } finally {
