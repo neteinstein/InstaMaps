@@ -83,4 +83,51 @@ class LocationTextParserTest {
 
         assertTrue(candidates.filterIsInstance<LocationCandidate.Coordinates>().isEmpty())
     }
+
+    @Test
+    fun `extracts a single capitalized-word hashtag as a weak place-name signal`() {
+        val candidates = parser.parse("Brunch spot! #Dishoom so good")
+
+        val match = candidates.filterIsInstance<LocationCandidate.PlaceName>().first()
+        assertEquals("Dishoom", match.text)
+    }
+
+    @Test
+    fun `ignores a single-word hashtag that is a common generic tag`() {
+        val candidates = parser.parse("Amazing meal today #Foodie #Instagood")
+
+        assertEquals(emptyList<LocationCandidate>(), candidates)
+    }
+
+    @Test
+    fun `extracts a capitalized phrase with no marker as a fallback place-name signal`() {
+        val candidates = parser.parse("Best tacos ever at Tacos El Gordo in the city")
+
+        val match = candidates.filterIsInstance<LocationCandidate.PlaceName>().first()
+        assertEquals("Tacos El Gordo", match.text)
+    }
+
+    @Test
+    fun `extracts an ALL CAPS on-screen overlay as a fallback place-name signal`() {
+        val candidates = parser.parse("TONY'S PIZZA NYC $5 A SLICE")
+
+        val texts = candidates.filterIsInstance<LocationCandidate.PlaceName>().map { it.text }
+        assertTrue(texts.contains("TONY'S PIZZA NYC"))
+    }
+
+    @Test
+    fun `does not extract a capitalized phrase that starts with a common sentence filler word`() {
+        val candidates = parser.parse("This Place Is Amazing you have to visit")
+
+        assertEquals(emptyList<LocationCandidate>(), candidates)
+    }
+
+    @Test
+    fun `ranks an explicit location above a fallback capitalized phrase found in the same text`() {
+        val candidates = parser.parse("Amazing trip!\nLocation: Golden Gate Bridge\nWe also loved Fisherman's Wharf")
+
+        val best = candidates.maxByOrNull { it.confidence } as LocationCandidate.PlaceName
+        assertEquals("Golden Gate Bridge", best.text)
+        assertTrue(candidates.any { it is LocationCandidate.PlaceName && it.text == "Fisherman's Wharf" })
+    }
 }

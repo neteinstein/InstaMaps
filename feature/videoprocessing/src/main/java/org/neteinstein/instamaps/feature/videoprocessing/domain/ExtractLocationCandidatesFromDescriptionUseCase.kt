@@ -11,7 +11,9 @@ package org.neteinstein.instamaps.feature.videoprocessing.domain
  *
  * Returns a plain (already-unwrapped) ranked list rather than a `Result`: a failed/empty metadata
  * fetch just means this fast path found nothing, not that the whole share failed - the caller
- * falls back to the video pipeline regardless of why this came up empty.
+ * falls back to the video pipeline regardless of why this came up empty. [locationTextAnalyzer]
+ * already returns its result ranked and deduplicated, so there's nothing left to do here beyond
+ * unwrapping the fetch.
  */
 class ExtractLocationCandidatesFromDescriptionUseCase(
     private val videoMetadataRepository: VideoMetadataRepository,
@@ -19,6 +21,6 @@ class ExtractLocationCandidatesFromDescriptionUseCase(
 ) {
     suspend operator fun invoke(url: String): List<LocationCandidate> {
         val description = videoMetadataRepository.fetchDescription(url).getOrNull().orEmpty()
-        return locationTextAnalyzer.analyze(description).sortedByDescending { it.confidence }
+        return locationTextAnalyzer.analyze(description)
     }
 }

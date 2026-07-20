@@ -67,7 +67,12 @@ class ProcessSharedUrlUseCase(
     }
 
     private suspend fun resolveBest(candidates: List<LocationCandidate>): ShareProcessingProgress.Found? {
-        for (candidate in candidates) {
+        // candidates is already ranked by confidence, so this only ever drops the least-likely,
+        // lowest-confidence guesses - e.g. LocationTextParser's capitalized-phrase fallback can
+        // surface a distinct low-confidence candidate per noisy video frame, and without a cap a
+        // location-less video could otherwise trigger dozens of sequential Places-search calls
+        // before finally giving up.
+        for (candidate in candidates.take(MAX_CANDIDATES_TO_RESOLVE)) {
             val found = tryResolve(candidate)
             if (found != null) return found
         }
@@ -91,4 +96,8 @@ class ProcessSharedUrlUseCase(
                     )
                 }
         }
+
+    private companion object {
+        const val MAX_CANDIDATES_TO_RESOLVE = 8
+    }
 }

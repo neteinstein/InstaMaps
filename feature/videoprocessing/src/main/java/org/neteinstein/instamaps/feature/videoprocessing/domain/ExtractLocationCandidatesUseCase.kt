@@ -93,7 +93,12 @@ class ExtractLocationCandidatesUseCase(
                     return@channelFlow
                 }
 
-                send(VideoAnalysisProgress.Completed(candidates.sortedByDescending { it.confidence }))
+                // The same on-screen overlay is typically OCR'd near-identically across many
+                // consecutive frames - mostConfidentDistinct() collapses those repeats (and any
+                // lower-confidence signal that only rediscovered part of a stronger one) down to
+                // one candidate per real-world signal before ranking is handed off for geocoding.
+                val rankedCandidates = candidates.sortedByDescending { it.confidence }.mostConfidentDistinct()
+                send(VideoAnalysisProgress.Completed(rankedCandidates))
             } finally {
                 withContext(NonCancellable) {
                     videoDownloadRepository.delete(video)
