@@ -17,11 +17,22 @@ import java.net.URI
 import java.util.UUID
 
 /**
- * Downloads a video with yt-dlp (via the youtubedl-android wrapper), capped at 480p per the perf
- * brief: `-f "bestvideo[height<=480]+bestaudio/best[height<=480]"`. This both shrinks the download
- * itself (~15MB -> ~2MB) and speeds up keyframe decoding later in
- * [MediaMetadataRetrieverFrameExtractor], since lower-resolution sources use simpler encoding
- * profiles - most of the end-to-end latency win happens here, before extraction even starts.
+ * Downloads a video with yt-dlp (via the youtubedl-android wrapper), capped at ~480p per the perf
+ * brief. This both shrinks the download itself (~15MB -> ~2MB) and speeds up keyframe decoding
+ * later in [MediaMetadataRetrieverFrameExtractor], since lower-resolution sources use simpler
+ * encoding profiles - most of the end-to-end latency win happens here, before extraction even
+ * starts.
+ *
+ * The cap is expressed as a format *sort* (`-S "res:480"`), not a format *filter*
+ * (`-f "...[height<=480]..."`). A filter hard-eliminates every format that doesn't match, which
+ * yt-dlp's own docs warn fails outright ("Requested format is not available") the moment nothing
+ * matches - as it did here for both Instagram Reels and TikTok, since both serve near-universally
+ * portrait video, where `height` is the *larger* dimension (a "480p" 9:16 clip is ~480x854, never
+ * <=480 tall). A sort only ever reorders formats, so [FORMAT_SELECTOR] (yt-dlp's own no-`-f`-given
+ * default) is guaranteed to resolve to *some* format, with [FORMAT_SORT] steering that choice
+ * toward ~480p. `res` is yt-dlp's resolution metric "calculated as the smallest dimension. So this
+ * works correctly for vertical videos as well" (see yt-dlp's README "Sorting Formats" section),
+ * unlike a raw `height` filter.
  *
  * [YoutubeDL.init]/[FFmpeg.init] are idempotent internally but do real file-extraction work the
  * first time, so initialization is deferred to the first real download rather than app startup,
@@ -51,7 +62,8 @@ class YtDlpVideoDownloadRepository(
 
                 val request =
                     YoutubeDLRequest(url)
-                        .addOption("-f", MAX_480P_FORMAT)
+                        .addOption("-f", FORMAT_SELECTOR)
+                        .addOption("-S", FORMAT_SORT)
                         .addOption("-o", File(outputDir, "video.%(ext)s").absolutePath)
 
                 attachInstagramCookiesIfAvailable(request, outputDir)
@@ -98,7 +110,17 @@ class YtDlpVideoDownloadRepository(
 
     private companion object {
         const val VIDEO_CACHE_DIR = "videoprocessing/downloads"
-        const val MAX_480P_FORMAT = "bestvideo[height<=480]+bestaudio/best[height<=480]"
+
+        // yt-dlp's own default selector when no `-f` is given at all (see its README's
+        // "Format Selection" intro) - always resolves to *some* format. Actual quality capping
+        // happens via FORMAT_SORT below, not here.
+        const val FORMAT_SELECTOR = "bv*+ba/b"
+
+        // Prefers the largest resolution not exceeding 480p, using yt-dlp's orientation-correct
+        // "smallest dimension" `res` metric, falling back to the smallest available resolution if
+        // nothing is under 480p (see yt-dlp's README "Sorting Formats" `res:480` example).
+        const val FORMAT_SORT = "res:480"
+
         const val COOKIE_FILE_NAME = "cookies.txt"
     }
 }
