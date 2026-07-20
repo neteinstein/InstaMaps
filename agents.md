@@ -32,12 +32,14 @@ logic belongs in `core:common` instead.
 | `core:common`            | domain, di          | `AppError`, `DispatcherProvider`, `LatLng`, `safeCall` - shared primitives used across every module         | Active |
 | `core:designsystem`      | Compose UI, theme   | Shared Compose theme/typography + reusable components (`PrimaryButton`, `LoadingIndicator`, `ErrorMessage`, `WarningBanner`) | Active |
 | `core:settings`          | domain, data, di    | `AppSettingsRepository` - persists the user-entered Places API key in Jetpack DataStore Preferences (covered by the app's Auto Backup, so it syncs to a user's other devices) | Active |
+| `core:instagramauth`     | domain, data, di    | `InstagramAuthRepository` - persists the Instagram session cookie captured by `feature:instagramauth`'s WebView login, encrypting it with an AndroidKeystore-backed AES-256-GCM key (`AndroidKeystoreInstagramSessionCipher`) before it touches Jetpack DataStore Preferences. Deliberately *excluded* from Auto Backup/device transfer (unlike `core:settings`) since the Keystore key never leaves the device and a restored file alone would be undecryptable - see `app`'s `data_extraction_rules.xml`/`full_backup_content.xml` | Active |
 | `feature:maps`           | domain, di          | Builds the Google Maps deep link (`BuildMapsDeepLinkUseCase`) and launches it (`MapsLauncher`, with a browser fallback if the Maps app isn't installed) | Active |
 | `feature:geocoding`      | domain, data, di    | `SearchPlaceUseCase` against the Places SDK (`PlacesSdkPlaceSearchRepository`), which lazily (re)initializes the SDK from `core:settings`'s current API key on every call instead of a build-time constant | Active |
-| `feature:videoprocessing`| domain, data, di    | Downloads the shared video (yt-dlp), extracts frames (`MediaMetadataRetriever`), OCRs them (ML Kit text recognition + entity extraction), turns raw text into `LocationCandidate`s | Active |
-| `feature:share`          | domain, presentation, work, di | Parses the shared URL, runs the video pipeline via `feature:videoprocessing`/`feature:geocoding` to resolve a `MapsDestination`, drives it from a `WorkManager` `CoroutineWorker` (survives the app being backgrounded) with a result notification, and renders an animated Compose UI (`ShareScreen`) that mirrors the same job. The idle/main screen also renders readiness warnings (missing API key, missing runtime permissions) with per-item action buttons, and gates auto-starting the pipeline on a shared video until they're resolved | Active |
+| `feature:videoprocessing`| domain, data, di    | Downloads the shared video (yt-dlp), extracts frames (`MediaMetadataRetriever`), OCRs them (ML Kit text recognition + entity extraction), turns raw text into `LocationCandidate`s. `YtDlpVideoDownloadRepository` attaches the persisted Instagram session cookie (`core:instagramauth`) to downloads when one is saved, and classifies a yt-dlp failure as `AppError.AuthenticationRequired` only when the source URL is actually an Instagram host, so a TikTok failure is never misattributed to a missing Instagram login | Active |
+| `feature:share`          | domain, presentation, work, di | Parses the shared URL, runs the video pipeline via `feature:videoprocessing`/`feature:geocoding` to resolve a `MapsDestination`, drives it from a `WorkManager` `CoroutineWorker` (survives the app being backgrounded) with a result notification, and renders an animated Compose UI (`ShareScreen`) that mirrors the same job. The idle/main screen also renders readiness warnings (missing API key, missing runtime permissions) with per-item action buttons, and gates auto-starting the pipeline on a shared video until they're resolved. It also shows a non-blocking "Connect Instagram" nudge banner when no session is saved, and reacts to an `AppError.AuthenticationRequired` failure by surfacing a dedicated login prompt (`ShareUiState.AuthRequired`) that automatically retries the same video the moment a fresh session is saved | Active |
 | `feature:settings`       | presentation, di    | The Settings screen (`SettingsScreen`/`SettingsViewModel`) the user pastes their Places API key into - reachable from the top-right button on `feature:share`'s main screen; delegates persistence to `core:settings` | Active |
-| `app`                    | presentation        | Composition root: `InstaMapsApplication` starts Koin with every feature/core module; `MainActivity` is the single UI entry point, handling launcher taps, the Instagram/TikTok share target, the result-notification deep-link trampoline into `MapsLauncher`, and toggling between the main (`feature:share`) and Settings (`feature:settings`) screens | Active |
+| `feature:instagramauth`  | presentation, di    | The Instagram login screen (`InstagramLoginScreen`/`InstagramLoginViewModel`): a `WebView` pointed at Instagram's own login page - InstaMaps never sees the entered password, only detects the `sessionid` cookie once login succeeds, then hands it to `core:instagramauth` to persist | Active |
+| `app`                    | presentation        | Composition root: `InstaMapsApplication` starts Koin with every feature/core module; `MainActivity` is the single UI entry point, handling launcher taps, the Instagram/TikTok share target, the result-notification deep-link trampoline into `MapsLauncher`, and switching between the main (`feature:share`), Settings (`feature:settings`), and Instagram login (`feature:instagramauth`) screens | Active |
 
 `settings.gradle.kts` is the source of truth for which modules are part of the build - a module
 commented out there is not compiled, tested, or linted, and should not be assumed to exist.
@@ -55,6 +57,20 @@ commented out there is not compiled, tested, or linted, and should not be assume
   `startKoin { }` call site, wiring every feature/core module's Koin module together
 - **Video download**: yt-dlp via `youtubedl-android`, forced to `bestvideo[height<=480]+bestaudio/best[height<=480]`
   to keep the download small and the on-device decode fast (see `YtDlpVideoDownloadRepository`)
+- **Instagram authentication**: a `WebView` (`feature:instagramauth`'s `InstagramLoginScreen`) loads
+  Instagram's own login page directly - InstaMaps never sees the entered password, only detects the
+  resulting `sessionid` cookie via `CookieManager` once login succeeds. The cookie is encrypted at
+  rest with an AndroidKeystore-backed AES-256-GCM key (`AndroidKeystoreInstagramSessionCipher`,
+  `core:instagramauth`) before being persisted in its own Jetpack DataStore Preferences file, which
+  - unlike `core:settings`'s API-key store - is excluded from both cloud backup and device-to-device
+  transfer (`app/src/main/res/xml/data_extraction_rules.xml` + `full_backup_content.xml`), since the
+  Keystore key itself never leaves the device and a restored copy of the encrypted file alone would
+  be undecryptable. `YtDlpVideoDownloadRepository` attaches the saved cookie to yt-dlp downloads
+  (Netscape cookie-file format) to improve reliability against Instagram's anonymous-request rate
+  limiting, and maps a yt-dlp failure to `AppError.AuthenticationRequired` only when the source URL
+  is actually an Instagram host (`feature:share`'s `ShareViewModel` reacts to that specific error by
+  prompting to log in again and automatically retrying once a fresh session is saved) - see
+  `feature:videoprocessing`'s `ytDlpErrorToAppError`.
 - **Frame extraction**: `MediaMetadataRetriever` with `OPTION_CLOSEST_SYNC` (snap to keyframes,
   skip P/B-frame decoding) and `getScaledFrameAtTime` (downscale during decode, not after), fed
   through a coroutine `Channel` producer/consumer pipeline so extraction never blocks on OCR
@@ -85,6 +101,15 @@ enabled. Until a key is saved, the main screen shows a warning (with a button st
 Settings) instead of attempting to geocode - see `feature:share`'s `ShareScreen`/`ShareViewModel`
 and `feature:settings`.
 
+Logging into Instagram is optional but recommended, not required to use the app: if no session is
+saved, the main screen shows a dismissible "Connect Instagram" banner (tap it to reach
+`feature:instagramauth`'s WebView login screen, pointed at Instagram's real login page - InstaMaps
+never sees the password, only the resulting session cookie). Public/anonymous-accessible content
+still downloads without logging in; if yt-dlp reports that a specific shared video needs a login,
+the main screen automatically switches to a "Log in to Instagram" prompt instead and retries that
+exact video the moment a fresh session is saved - see `feature:share`'s `ShareViewModel`
+(`isInstagramAuthenticated`/`ShareUiState.AuthRequired`) and `core:instagramauth`.
+
 ```bash
 # Build every active module
 ./gradlew assembleDebug
@@ -108,8 +133,11 @@ and `feature:settings`.
 
 - Unit tests live under each module's `src/test/`. Domain and data layers must be covered by
   plain JUnit tests - this project has no emulator/instrumentation tests, so anything that can't
-  be reasonably unit-tested (e.g. framework glue that just calls `context.startActivity`) should
-  be kept thin rather than pulling in Robolectric.
+  be reasonably unit-tested (e.g. framework glue that just calls `context.startActivity`, or
+  `AndroidKeystoreInstagramSessionCipher`'s direct calls into the real `AndroidKeyStore` provider)
+  should be kept thin rather than pulling in Robolectric. Keep the actual crypto/framework call
+  behind a small interface (e.g. `InstagramSessionCipher`) so the class that *uses* it
+  (`EncryptedInstagramAuthRepository`) can still be fully unit-tested with a fake.
 - Target **80%+ line coverage** on `domain` and `data` packages. `di`, `presentation`, and `work`
   packages, plus `core:designsystem` (pure Compose UI / WorkManager-and-notification glue with no
   business logic worth measuring, none of it exercisable without instrumentation/Robolectric,

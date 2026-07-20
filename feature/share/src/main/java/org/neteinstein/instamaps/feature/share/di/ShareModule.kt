@@ -29,6 +29,7 @@ val shareModule =
                 context = androidContext(),
                 parseSharedTextUseCase = get(),
                 isPlacesApiKeyConfiguredUseCase = get(),
+                observeInstagramAuthStateUseCase = get(),
             )
         }
     }

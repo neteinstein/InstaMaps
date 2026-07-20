@@ -12,6 +12,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import org.koin.android.ext.android.inject
 import org.neteinstein.instamaps.core.designsystem.theme.InstaMapsTheme
+import org.neteinstein.instamaps.feature.instagramauth.presentation.InstagramLoginRoute
 import org.neteinstein.instamaps.feature.maps.MapsLauncher
 import org.neteinstein.instamaps.feature.maps.domain.MapsDestination
 import org.neteinstein.instamaps.feature.settings.presentation.SettingsRoute
@@ -23,8 +24,9 @@ import org.neteinstein.instamaps.feature.share.work.ShareDeepLink
  * `<intent-filter>` blocks on this activity in the manifest:
  *
  * 1. Plain launcher tap: no shared text, renders [ShareRoute] with a `null` `sharedText` - which
- *    is also what renders the main-screen readiness warnings (missing API key/permissions) since
- *    they're computed inside [ShareRoute] regardless of how the screen was reached.
+ *    is also what renders the main-screen readiness warnings (missing API key/permissions, no
+ *    Instagram session) since they're computed inside [ShareRoute] regardless of how the screen
+ *    was reached.
  * 2. Instagram/TikTok share ([Intent.ACTION_SEND], `text/plain`): renders [ShareRoute] with the
  *    shared text - it owns the whole download/OCR/geocode pipeline and its animated UI, but only
  *    starts it once ready; otherwise the main screen with warnings shows instead (see
@@ -37,9 +39,11 @@ import org.neteinstein.instamaps.feature.share.work.ShareDeepLink
  *    place): a pure trampoline - hand off to [MapsLauncher] and finish immediately, without ever
  *    drawing this app's own UI, since the pipeline already completed in the background.
  *
- * Also owns the Main/Settings toggle: there's no Navigation-Compose in this app, so opening
- * Settings (the top-right button on the main screen) is just a local `showSettings` flag flipped
- * back by either the Settings screen's back arrow or the system back gesture/button.
+ * Also owns the Share/Settings/Instagram-login switch: there's no Navigation-Compose in this app,
+ * so opening Settings (the top-right button on the main screen) or the Instagram login screen
+ * (from a warning banner or [org.neteinstein.instamaps.feature.share.presentation.ShareUiState.AuthRequired])
+ * is just a local [Screen] flag flipped back by that screen's own back arrow, a successful login,
+ * or the system back gesture/button.
  */
 class MainActivity : ComponentActivity() {
     private val mapsLauncher: MapsLauncher by inject()
@@ -58,16 +62,22 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             InstaMapsTheme {
-                var showSettings by rememberSaveable { mutableStateOf(false) }
-                BackHandler(enabled = showSettings) { showSettings = false }
+                var screen by rememberSaveable { mutableStateOf(Screen.SHARE) }
+                BackHandler(enabled = screen != Screen.SHARE) { screen = Screen.SHARE }
 
-                if (showSettings) {
-                    SettingsRoute(onBack = { showSettings = false })
-                } else {
-                    ShareRoute(
-                        sharedText = sharedText,
-                        onOpenSettings = { showSettings = true },
-                    )
+                when (screen) {
+                    Screen.SETTINGS -> SettingsRoute(onBack = { screen = Screen.SHARE })
+                    Screen.INSTAGRAM_LOGIN ->
+                        InstagramLoginRoute(
+                            onBack = { screen = Screen.SHARE },
+                            onLoginSuccess = { screen = Screen.SHARE },
+                        )
+                    Screen.SHARE ->
+                        ShareRoute(
+                            sharedText = sharedText,
+                            onOpenSettings = { screen = Screen.SETTINGS },
+                            onNeedsInstagramLogin = { screen = Screen.INSTAGRAM_LOGIN },
+                        )
                 }
             }
         }
@@ -100,4 +110,6 @@ class MainActivity : ComponentActivity() {
         if (action != Intent.ACTION_SEND || type != "text/plain") return null
         return getStringExtra(Intent.EXTRA_TEXT)
     }
+
+    private enum class Screen { SHARE, SETTINGS, INSTAGRAM_LOGIN }
 }

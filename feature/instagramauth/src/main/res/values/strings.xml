@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="instagram_login_title">Connect Instagram</string>
+    <string name="instagram_login_back">Back</string>
+    <string name="instagram_login_explanation">Log in to Instagram so InstaMaps can fetch video locations more reliably. InstaMaps only stores your session, never your password.</string>
+</resources>

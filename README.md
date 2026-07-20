@@ -12,7 +12,9 @@ deep link straight into Google Maps. Everything runs on-device; there is no back
 1. **Share target**: an `ACTION_SEND` intent filter (`text/plain`) puts InstaMaps in the OS share
    sheet for any app, including Instagram and TikTok.
 2. **Download**: the shared link is resolved and the video is downloaded on-device with yt-dlp
-   (via `youtubedl-android`), capped at 480p to keep the download small and decoding fast.
+   (via `youtubedl-android`), capped at 480p to keep the download small and decoding fast. For
+   Instagram links, a saved login session (see [Instagram login](#instagram-login) below) is
+   attached to the download to improve reliability against anonymous-request rate limiting.
 3. **Frame extraction**: `MediaMetadataRetriever` pulls keyframes from the video every couple of
    seconds (`OPTION_CLOSEST_SYNC` + `getScaledFrameAtTime`, so it never decodes a full-resolution
    frame or walks P/B-frames).
@@ -31,6 +33,8 @@ tap it to jump straight into Maps.
 - Android 8.1+ (API 27) device or emulator.
 - A Google Places API key (**Places API (New)** enabled on a Google Cloud project) - entered into
   the app itself at runtime, not needed at build time. See [Setup](#setup).
+- An Instagram account, if you want to log in to improve download reliability for Instagram links
+  - optional, not required. See [Instagram login](#instagram-login).
 
 ## Setup
 
@@ -54,6 +58,22 @@ screen), paste the key into the Places API Key field, and tap Save. The key is s
 with Jetpack DataStore and included in Android's automatic app backup, so it carries over to your
 other devices/a reinstall without re-entering it. Until a key is saved, the main screen shows a
 warning with a shortcut straight to Settings instead of attempting to geocode.
+
+### Instagram login
+
+Logging into Instagram is optional - InstaMaps downloads plenty of public content without it -
+but improves reliability, since Instagram rate-limits and occasionally blocks anonymous
+(logged-out) requests. If no session is saved, the main screen shows a dismissible "Connect Instagram"
+banner; tapping it opens a screen with a real `WebView` pointed at Instagram's own login page.
+InstaMaps never sees the password you type - it only detects the session cookie Instagram sets
+once login succeeds, encrypts it on-device (AndroidKeystore-backed AES-256-GCM), and stores it
+separately from your Places API key, deliberately left out of Android's backup/device-transfer
+so a restored copy on another device (where the encryption key wouldn't exist) can't leave a
+broken, undecryptable session behind.
+
+If a specific shared video still needs a login (e.g. an age-gated or otherwise restricted post),
+the main screen automatically shows a "Log in to Instagram" prompt instead of a generic error, and
+retries that exact video as soon as you log in again.
 
 ## Usage
 

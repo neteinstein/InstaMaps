@@ -13,6 +13,8 @@ import androidx.work.workDataOf
 import kotlinx.coroutines.CancellationException
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
+import org.neteinstein.instamaps.core.common.AppError
+import org.neteinstein.instamaps.core.instagramauth.domain.ClearInstagramSessionUseCase
 import org.neteinstein.instamaps.feature.share.domain.ProcessSharedUrlUseCase
 import org.neteinstein.instamaps.feature.share.domain.ShareProcessingProgress
 
@@ -31,6 +33,7 @@ class ProcessSharedUrlWorker(
     KoinComponent {
     private val processSharedUrlUseCase: ProcessSharedUrlUseCase by inject()
     private val notifier: ShareNotifier by inject()
+    private val clearInstagramSessionUseCase: ClearInstagramSessionUseCase by inject()
 
     override suspend fun doWork(): Result {
         val url =
@@ -45,7 +48,7 @@ class ProcessSharedUrlWorker(
                 latestProgress = progress
                 setProgress(progress.toWorkData())
             }
-            latestProgress.toWorkResult()
+            latestProgress.toWorkResult(url)
         } catch (cancellation: CancellationException) {
             throw cancellation
         } catch (throwable: Throwable) {
@@ -61,7 +64,7 @@ class ProcessSharedUrlWorker(
 
     override suspend fun getForegroundInfo(): ForegroundInfo = notifier.buildProcessingForegroundInfo()
 
-    private fun ShareProcessingProgress.toWorkResult(): Result =
+    private suspend fun ShareProcessingProgress.toWorkResult(url: String): Result =
         when (this) {
             is ShareProcessingProgress.Found -> {
                 notifier.notifyFound(destination, displayName)
@@ -77,11 +80,7 @@ class ProcessSharedUrlWorker(
                 notifier.notifyNotFound(message)
                 Result.failure(workDataOf(KEY_ERROR_MESSAGE to message, KEY_NOT_FOUND to true))
             }
-            is ShareProcessingProgress.Failed -> {
-                val message = error.message ?: "Something went wrong"
-                notifier.notifyFailed(message)
-                Result.failure(workDataOf(KEY_ERROR_MESSAGE to message))
-            }
+            is ShareProcessingProgress.Failed -> Result.failure(error.toFailureWorkData(url))
             else -> {
                 // The pipeline Flow always terminates in Found/NotFound/Failed - anything else
                 // reaching here means it completed without emitting a terminal state.
@@ -91,12 +90,32 @@ class ProcessSharedUrlWorker(
             }
         }
 
+    /**
+     * [AppError.AuthenticationRequired] gets its own branch: the stale session is cleared right
+     * away (so a retry doesn't just attach the same rejected cookie again) and [KEY_URL] is
+     * echoed back so `ShareViewModel` can automatically resume processing the same [url] once the
+     * user logs in again - see `ShareUiState.AuthRequired`. Every other failure keeps the existing
+     * plain-error shape.
+     */
+    private suspend fun Throwable.toFailureWorkData(url: String): Data {
+        val message = message ?: "Something went wrong"
+        return if (this is AppError.AuthenticationRequired) {
+            clearInstagramSessionUseCase()
+            notifier.notifyFailed(message)
+            workDataOf(KEY_ERROR_MESSAGE to message, KEY_AUTH_REQUIRED to true, KEY_URL to url)
+        } else {
+            notifier.notifyFailed(message)
+            workDataOf(KEY_ERROR_MESSAGE to message)
+        }
+    }
+
     companion object {
         const val KEY_URL = "url"
         const val KEY_STAGE = "stage"
         const val KEY_FRAME_INDEX = "frame_index"
         const val KEY_ERROR_MESSAGE = "error_message"
         const val KEY_NOT_FOUND = "not_found"
+        const val KEY_AUTH_REQUIRED = "auth_required"
         const val KEY_MAPS_QUERY = "maps_query"
         const val KEY_PLACE_ID = "place_id"
         const val KEY_DISPLAY_NAME = "display_name"

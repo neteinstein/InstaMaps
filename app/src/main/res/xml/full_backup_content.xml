@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Pre-Android-12 (API <31) Auto Backup config, referenced by AndroidManifest.xml's
+  android:fullBackupContent. Same exclusion as data_extraction_rules.xml (the API 31+
+  equivalent) - see that file's comment for why.
+-->
+<full-backup-content>
+    <exclude domain="file" path="datastore/instagram_auth.preferences_pb" />
+</full-backup-content>

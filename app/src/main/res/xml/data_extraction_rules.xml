@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Android 12+ (API 31+) backup/transfer config, referenced by AndroidManifest.xml's
+  android:dataExtractionRules. Excludes core:instagramauth's DataStore file from both cloud
+  backup and device-to-device transfer: it holds the Instagram session cookie encrypted with an
+  AndroidKeystore-backed AES key that never leaves this device's secure hardware, so a restored
+  copy of the encrypted file alone would be undecryptable garbage on any other device/reinstall -
+  see AndroidKeystoreInstagramSessionCipher's kdoc. The Places API key (core:settings) has no such
+  restriction and is intentionally left eligible for both.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="file" path="datastore/instagram_auth.preferences_pb" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="file" path="datastore/instagram_auth.preferences_pb" />
+    </device-transfer>
+</data-extraction-rules>
