@@ -7,24 +7,24 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import org.neteinstein.instamaps.core.settings.domain.ObservePlacesApiKeyUseCase
-import org.neteinstein.instamaps.core.settings.domain.SavePlacesApiKeyUseCase
+import org.neteinstein.instamaps.core.settings.domain.ObserveGeminiApiKeyUseCase
+import org.neteinstein.instamaps.core.settings.domain.SaveGeminiApiKeyUseCase
 
 /**
- * Loads the currently saved Places API key once on init - a one-shot `.first()`, not an ongoing
+ * Loads the currently saved Gemini API key once on init - a one-shot `.first()`, not an ongoing
  * collector - so nothing can clobber the text the user is actively typing in the field while
  * this screen is open.
  */
 class SettingsViewModel(
-    private val observePlacesApiKeyUseCase: ObservePlacesApiKeyUseCase,
-    private val savePlacesApiKeyUseCase: SavePlacesApiKeyUseCase,
+    private val observeGeminiApiKeyUseCase: ObserveGeminiApiKeyUseCase,
+    private val saveGeminiApiKeyUseCase: SaveGeminiApiKeyUseCase,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(SettingsUiState())
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
 
     init {
         viewModelScope.launch {
-            val savedKey = observePlacesApiKeyUseCase().first()
+            val savedKey = observeGeminiApiKeyUseCase().first()
             _uiState.value = _uiState.value.copy(apiKeyInput = savedKey.orEmpty())
         }
     }
@@ -35,7 +35,7 @@ class SettingsViewModel(
 
     fun onSaveClicked() {
         viewModelScope.launch {
-            savePlacesApiKeyUseCase(_uiState.value.apiKeyInput)
+            saveGeminiApiKeyUseCase(_uiState.value.apiKeyInput)
             _uiState.value = _uiState.value.copy(justSaved = true)
         }
     }

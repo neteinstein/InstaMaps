@@ -120,7 +120,7 @@ private fun markPermissionRequested(
 
 // Deliberately a plain SharedPreferences file, separate from `core:settings`'s DataStore - this
 // flag is ephemeral UI-flow bookkeeping ("have we ever asked for this permission"), not a
-// user-facing setting, so it has no business being backed up/synced like the Places API key.
+// user-facing setting, so it has no business being backed up/synced like the Gemini API key.
 private fun Context.permissionRequestPrefs() = getSharedPreferences("runtime_permission_requests", Context.MODE_PRIVATE)
 
 private tailrec fun Context.findActivity(): Activity? =

@@ -13,20 +13,20 @@ private class FakeAppSettingsRepository(
     private val key = MutableStateFlow(initial)
     var lastSaved: String? = null
 
-    override fun observePlacesApiKey(): Flow<String?> = key
+    override fun observeGeminiApiKey(): Flow<String?> = key
 
-    override suspend fun savePlacesApiKey(apiKey: String) {
+    override suspend fun saveGeminiApiKey(apiKey: String) {
         lastSaved = apiKey
         key.value = apiKey.trim().ifEmpty { null }
     }
 }
 
-class ObservePlacesApiKeyUseCaseTest {
+class ObserveGeminiApiKeyUseCaseTest {
     @Test
     fun `emits the value currently held by the repository`() =
         runTest {
             val repository = FakeAppSettingsRepository(initial = "AIzaSyExample")
-            val useCase = ObservePlacesApiKeyUseCase(repository)
+            val useCase = ObserveGeminiApiKeyUseCase(repository)
 
             useCase().test {
                 assertEquals("AIzaSyExample", awaitItem())
@@ -37,7 +37,7 @@ class ObservePlacesApiKeyUseCaseTest {
     fun `emits null when nothing has been saved`() =
         runTest {
             val repository = FakeAppSettingsRepository(initial = null)
-            val useCase = ObservePlacesApiKeyUseCase(repository)
+            val useCase = ObserveGeminiApiKeyUseCase(repository)
 
             useCase().test {
                 assertEquals(null, awaitItem())
@@ -45,12 +45,12 @@ class ObservePlacesApiKeyUseCaseTest {
         }
 }
 
-class SavePlacesApiKeyUseCaseTest {
+class SaveGeminiApiKeyUseCaseTest {
     @Test
     fun `delegates to the repository`() =
         runTest {
             val repository = FakeAppSettingsRepository()
-            val useCase = SavePlacesApiKeyUseCase(repository)
+            val useCase = SaveGeminiApiKeyUseCase(repository)
 
             useCase("AIzaSyExample")
 
@@ -58,16 +58,16 @@ class SavePlacesApiKeyUseCaseTest {
         }
 }
 
-class IsPlacesApiKeyConfiguredUseCaseTest {
+class IsGeminiApiKeyConfiguredUseCaseTest {
     @Test
     fun `is true once a non-blank key is saved`() =
         runTest {
             val repository = FakeAppSettingsRepository(initial = null)
-            val useCase = IsPlacesApiKeyConfiguredUseCase(repository)
+            val useCase = IsGeminiApiKeyConfiguredUseCase(repository)
 
             useCase().test {
                 assertEquals(false, awaitItem())
-                repository.savePlacesApiKey("AIzaSyExample")
+                repository.saveGeminiApiKey("AIzaSyExample")
                 assertEquals(true, awaitItem())
             }
         }
@@ -76,7 +76,7 @@ class IsPlacesApiKeyConfiguredUseCaseTest {
     fun `is false when the saved key is blank`() =
         runTest {
             val repository = FakeAppSettingsRepository(initial = "   ")
-            val useCase = IsPlacesApiKeyConfiguredUseCase(repository)
+            val useCase = IsGeminiApiKeyConfiguredUseCase(repository)
 
             useCase().test {
                 assertEquals(false, awaitItem())

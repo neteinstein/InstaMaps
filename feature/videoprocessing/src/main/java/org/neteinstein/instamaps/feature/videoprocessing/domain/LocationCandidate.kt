@@ -6,7 +6,7 @@ import org.neteinstein.instamaps.core.common.LatLng
  * A possible location mentioned somewhere in a video's caption or on-screen text, before it has
  * been resolved to a real place via geocoding. [confidence] (roughly 0-1) lets
  * [ExtractLocationCandidatesUseCase] rank candidates gathered from multiple frames/sources so the
- * most-likely one is tried first against the Places SDK.
+ * most-likely one is resolved first.
  */
 sealed class LocationCandidate {
     abstract val confidence: Float

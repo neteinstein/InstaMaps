@@ -1,103 +1,67 @@
 package org.neteinstein.instamaps.feature.share.domain
 
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.flow
-import org.neteinstein.instamaps.feature.geocoding.domain.SearchPlaceUseCase
-import org.neteinstein.instamaps.feature.maps.domain.MapsDestination
-import org.neteinstein.instamaps.feature.videoprocessing.domain.ExtractLocationCandidatesFromDescriptionUseCase
-import org.neteinstein.instamaps.feature.videoprocessing.domain.ExtractLocationCandidatesUseCase
-import org.neteinstein.instamaps.feature.videoprocessing.domain.LocationCandidate
-import org.neteinstein.instamaps.feature.videoprocessing.domain.VideoAnalysisProgress
+import org.neteinstein.instamaps.feature.geocoding.domain.ResolveLocationUseCase
+import org.neteinstein.instamaps.feature.videoprocessing.domain.AllTextProgress
+import org.neteinstein.instamaps.feature.videoprocessing.domain.CollectAllTextUseCase
 
 /**
- * Orchestrates the whole share-to-maps-link pipeline. Tries
- * [extractLocationCandidatesFromDescriptionUseCase] first - a single lightweight metadata fetch
- * against the shared video's own caption/description, which often already names the place - and
- * only falls back to the much more expensive download+OCR pipeline in
- * [extractLocationCandidatesUseCase] if that comes up empty or fails to resolve to a real place.
- * Either source's ranked candidates are resolved the same way (see [resolveBest]).
+ * Orchestrates the full share-to-maps-link pipeline using the Gemini API:
  *
- * [LocationCandidate.PlaceName] candidates are resolved through [searchPlaceUseCase] against the
- * Places SDK, falling back to the next-ranked candidate if a search comes up empty - the caption
- * text or OCR/entity extraction step can be ambiguous or misread a sign, so the second-best guess
- * is worth trying before giving up. [LocationCandidate.Coordinates] candidates skip geocoding
- * entirely: Google Maps' universal link accepts a bare "lat,lng" query natively, and
- * [SearchPlaceUseCase] only supports text search.
+ * 1. Fetches the shared video's caption/description (fast metadata-only fetch).
+ * 2. Downloads the video and OCRs every extracted frame to collect all on-screen text.
+ * 3. Sends the combined text (caption + all frame OCR) to [resolveLocationUseCase], which calls
+ *    the Gemini 1.5 Flash API with the prompt:
+ *    "these are caption and text from a video that talks about a specific place. from those
+ *    determine the place and return Google maps location"
+ * 4. Emits [ShareProcessingProgress.Found] with the resolved [MapsDestination] on success, or
+ *    [ShareProcessingProgress.NotFound] / [ShareProcessingProgress.Failed] on failure.
  */
 class ProcessSharedUrlUseCase(
-    private val extractLocationCandidatesFromDescriptionUseCase: ExtractLocationCandidatesFromDescriptionUseCase,
-    private val extractLocationCandidatesUseCase: ExtractLocationCandidatesUseCase,
-    private val searchPlaceUseCase: SearchPlaceUseCase,
+    private val collectAllTextUseCase: CollectAllTextUseCase,
+    private val resolveLocationUseCase: ResolveLocationUseCase,
 ) {
     operator fun invoke(url: String): Flow<ShareProcessingProgress> =
         flow {
-            emit(ShareProcessingProgress.CheckingDescription)
-            val descriptionCandidates = extractLocationCandidatesFromDescriptionUseCase(url)
-            if (descriptionCandidates.isNotEmpty()) {
-                emit(ShareProcessingProgress.Geocoding)
-                val found = resolveBest(descriptionCandidates)
-                if (found != null) {
-                    emit(found)
-                    return@flow
-                }
-            }
+            var failedError: Throwable? = null
+            val allTexts = mutableListOf<String>()
 
-            extractLocationCandidatesUseCase(url).collect { progress ->
+            collectAllTextUseCase(url).collect { progress ->
                 when (progress) {
-                    is VideoAnalysisProgress.Downloading -> emit(ShareProcessingProgress.Downloading)
-                    is VideoAnalysisProgress.ExtractingFrames -> emit(ShareProcessingProgress.ExtractingFrames)
-                    is VideoAnalysisProgress.AnalyzingFrame ->
-                        emit(ShareProcessingProgress.AnalyzingFrame(progress.frameIndex))
-                    is VideoAnalysisProgress.Failed -> emit(ShareProcessingProgress.Failed(progress.error))
-                    is VideoAnalysisProgress.Completed -> emitResolution(progress.candidates)
+                    is AllTextProgress.CheckingDescription -> emit(ShareProcessingProgress.CheckingDescription)
+                    is AllTextProgress.Downloading -> emit(ShareProcessingProgress.Downloading)
+                    is AllTextProgress.ExtractingFrames -> emit(ShareProcessingProgress.ExtractingFrames)
+                    is AllTextProgress.AnalyzingFrame -> emit(ShareProcessingProgress.AnalyzingFrame(progress.frameIndex))
+                    is AllTextProgress.Completed -> allTexts.addAll(progress.texts)
+                    is AllTextProgress.Failed -> failedError = progress.error
                 }
             }
-        }
 
-    private suspend fun FlowCollector<ShareProcessingProgress>.emitResolution(candidates: List<LocationCandidate>) {
-        if (candidates.isEmpty()) {
-            emit(ShareProcessingProgress.NotFound("No location was found in this video"))
-            return
-        }
-
-        emit(ShareProcessingProgress.Geocoding)
-        val found = resolveBest(candidates)
-        emit(found ?: ShareProcessingProgress.NotFound("Couldn't match any detected location to a real place"))
-    }
-
-    private suspend fun resolveBest(candidates: List<LocationCandidate>): ShareProcessingProgress.Found? {
-        // candidates is already ranked by confidence, so this only ever drops the least-likely,
-        // lowest-confidence guesses - e.g. LocationTextParser's capitalized-phrase fallback can
-        // surface a distinct low-confidence candidate per noisy video frame, and without a cap a
-        // location-less video could otherwise trigger dozens of sequential Places-search calls
-        // before finally giving up.
-        for (candidate in candidates.take(MAX_CANDIDATES_TO_RESOLVE)) {
-            val found = tryResolve(candidate)
-            if (found != null) return found
-        }
-        return null
-    }
-
-    private suspend fun tryResolve(candidate: LocationCandidate): ShareProcessingProgress.Found? =
-        when (candidate) {
-            is LocationCandidate.Coordinates -> {
-                val latLng = candidate.latLng
-                ShareProcessingProgress.Found(
-                    destination = MapsDestination(query = "${latLng.latitude},${latLng.longitude}"),
-                    displayName = "%.5f, %.5f".format(latLng.latitude, latLng.longitude),
-                )
+            if (failedError != null) {
+                emit(ShareProcessingProgress.Failed(failedError))
+                return@flow
             }
-            is LocationCandidate.PlaceName ->
-                searchPlaceUseCase(candidate.text).getOrNull()?.let { place ->
-                    ShareProcessingProgress.Found(
-                        destination = MapsDestination(query = place.name, placeId = place.placeId),
-                        displayName = place.name,
+
+            if (allTexts.isEmpty()) {
+                emit(ShareProcessingProgress.NotFound("No text was found in this video"))
+                return@flow
+            }
+
+            emit(ShareProcessingProgress.Geocoding)
+            val combinedText = allTexts.joinToString("\n")
+            resolveLocationUseCase(combinedText).fold(
+                onSuccess = { destination ->
+                    emit(
+                        ShareProcessingProgress.Found(
+                            destination = destination,
+                            displayName = destination.query,
+                        ),
                     )
-                }
+                },
+                onFailure = { error ->
+                    emit(ShareProcessingProgress.NotFound("Could not identify the location: ${error.message}"))
+                },
+            )
         }
-
-    private companion object {
-        const val MAX_CANDIDATES_TO_RESOLVE = 8
-    }
 }

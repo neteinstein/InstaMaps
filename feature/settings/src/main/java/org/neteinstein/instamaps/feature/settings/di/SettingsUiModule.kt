@@ -12,8 +12,8 @@ val settingsUiModule =
     module {
         viewModel {
             SettingsViewModel(
-                observePlacesApiKeyUseCase = get(),
-                savePlacesApiKeyUseCase = get(),
+                observeGeminiApiKeyUseCase = get(),
+                saveGeminiApiKeyUseCase = get(),
             )
         }
     }

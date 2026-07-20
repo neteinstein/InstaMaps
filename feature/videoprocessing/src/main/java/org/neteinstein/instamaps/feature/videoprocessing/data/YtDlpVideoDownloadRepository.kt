@@ -40,8 +40,8 @@ import java.util.UUID
  *
  * Reaches into [instagramAuthRepository] directly (not through a use case) to attach a saved
  * Instagram session to every download, the same "data layer reads a cross-cutting core
- * dependency directly" shape `feature:geocoding`'s `PlacesSdkPlaceSearchRepository` already uses
- * for the Places API key. The cookie file is domain-scoped (see [buildNetscapeCookieFileContent]),
+ * dependency directly" shape `feature:geocoding`'s `GeminiLocationRepository` already uses
+ * for the Gemini API key. The cookie file is domain-scoped (see [buildNetscapeCookieFileContent]),
  * so attaching it unconditionally is a harmless no-op for TikTok/other URLs - yt-dlp only sends a
  * cookie to a request whose host matches the cookie's domain.
  */

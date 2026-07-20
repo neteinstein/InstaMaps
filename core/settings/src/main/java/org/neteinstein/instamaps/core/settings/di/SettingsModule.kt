@@ -6,9 +6,9 @@ import org.koin.android.ext.koin.androidContext
 import org.koin.dsl.module
 import org.neteinstein.instamaps.core.settings.data.DataStoreAppSettingsRepository
 import org.neteinstein.instamaps.core.settings.domain.AppSettingsRepository
-import org.neteinstein.instamaps.core.settings.domain.IsPlacesApiKeyConfiguredUseCase
-import org.neteinstein.instamaps.core.settings.domain.ObservePlacesApiKeyUseCase
-import org.neteinstein.instamaps.core.settings.domain.SavePlacesApiKeyUseCase
+import org.neteinstein.instamaps.core.settings.domain.IsGeminiApiKeyConfiguredUseCase
+import org.neteinstein.instamaps.core.settings.domain.ObserveGeminiApiKeyUseCase
+import org.neteinstein.instamaps.core.settings.domain.SaveGeminiApiKeyUseCase
 
 private const val SETTINGS_DATASTORE_FILE_NAME = "app_settings"
 
@@ -26,7 +26,7 @@ val settingsModule =
             )
         }
         single<AppSettingsRepository> { DataStoreAppSettingsRepository(dataStore = get()) }
-        single { ObservePlacesApiKeyUseCase(repository = get()) }
-        single { SavePlacesApiKeyUseCase(repository = get()) }
-        single { IsPlacesApiKeyConfiguredUseCase(repository = get()) }
+        single { ObserveGeminiApiKeyUseCase(repository = get()) }
+        single { SaveGeminiApiKeyUseCase(repository = get()) }
+        single { IsGeminiApiKeyConfiguredUseCase(repository = get()) }
     }

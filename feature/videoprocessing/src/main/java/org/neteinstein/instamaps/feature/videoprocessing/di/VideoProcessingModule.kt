@@ -13,6 +13,7 @@ import org.neteinstein.instamaps.feature.videoprocessing.data.MlKitEntityExtract
 import org.neteinstein.instamaps.feature.videoprocessing.data.MlKitTextRecognitionRepository
 import org.neteinstein.instamaps.feature.videoprocessing.data.YtDlpVideoDownloadRepository
 import org.neteinstein.instamaps.feature.videoprocessing.data.YtDlpVideoMetadataRepository
+import org.neteinstein.instamaps.feature.videoprocessing.domain.CollectAllTextUseCase
 import org.neteinstein.instamaps.feature.videoprocessing.domain.EntityExtractionRepository
 import org.neteinstein.instamaps.feature.videoprocessing.domain.ExtractLocationCandidatesFromDescriptionUseCase
 import org.neteinstein.instamaps.feature.videoprocessing.domain.ExtractLocationCandidatesUseCase
@@ -60,6 +61,15 @@ val videoProcessingModule =
             ExtractLocationCandidatesFromDescriptionUseCase(
                 videoMetadataRepository = get(),
                 locationTextAnalyzer = get(),
+            )
+        }
+        factory {
+            CollectAllTextUseCase(
+                videoMetadataRepository = get(),
+                videoDownloadRepository = get(),
+                frameExtractorRepository = get(),
+                textRecognitionRepository = get(),
+                dispatcherProvider = get(),
             )
         }
     }
