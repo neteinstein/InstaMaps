@@ -213,6 +213,25 @@ class ProcessSharedUrlUseCaseTest {
         }
 
     @Test
+    fun `caps resolution attempts instead of querying every low-confidence fallback candidate`() =
+        runTest {
+            // Nine distinct two-word runs, each separated by a lowercase "and" so
+            // LocationTextParser's capitalized-phrase fallback (see LocationTextParserTest)
+            // surfaces nine separate low-confidence PlaceName candidates from one frame - more
+            // than ProcessSharedUrlUseCase should ever query the Places SDK with for a single
+            // share.
+            val frameText =
+                "Alpha Bravo and Charlie Delta and Echo Foxtrot and Golf Hotel and India Juliet " +
+                    "and Kilo Lima and Mike November and Oscar Papa and Quebec Romeo"
+            val (useCase, placeSearchRepository, _) = useCaseFor(frameText = frameText)
+
+            val progress = useCase("https://instagram.com/reel/abc").toList()
+
+            assertTrue(progress.last() is ShareProcessingProgress.NotFound)
+            assertEquals(8, placeSearchRepository.receivedQueries.size)
+        }
+
+    @Test
     fun `propagates a download failure as a terminal Failed state`() =
         runTest {
             val error = AppError.Network("boom")

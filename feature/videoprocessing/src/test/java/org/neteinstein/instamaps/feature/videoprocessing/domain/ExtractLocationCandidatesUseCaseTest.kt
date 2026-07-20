@@ -115,6 +115,30 @@ class ExtractLocationCandidatesUseCaseTest {
         }
 
     @Test
+    fun `collapses the same on-screen text OCR'd from multiple frames into a single candidate`() =
+        runTest {
+            val firstBitmap = mock<Bitmap>()
+            val secondBitmap = mock<Bitmap>()
+            val frames = listOf(VideoFrame(0L, firstBitmap), VideoFrame(500L, secondBitmap))
+            val useCase =
+                ExtractLocationCandidatesUseCase(
+                    videoDownloadRepository = FakeVideoDownloadRepository(),
+                    frameExtractorRepository = FakeFrameExtractorRepository(frames),
+                    textRecognitionRepository =
+                        FakeTextRecognitionRepository(
+                            mapOf(firstBitmap to "📍 Dishoom Shoreditch", secondBitmap to "📍 Dishoom Shoreditch"),
+                        ),
+                    locationTextAnalyzer = LocationTextAnalyzer(FakeEntityExtractionRepository(), LocationTextParser()),
+                    dispatcherProvider = TestDispatcherProvider(),
+                )
+
+            val progress = useCase("https://instagram.com/reel/abc").toList()
+
+            val completed = progress.filterIsInstance<VideoAnalysisProgress.Completed>().single()
+            assertEquals(1, completed.candidates.size)
+        }
+
+    @Test
     fun `recycles every frame bitmap after analysis`() =
         runTest {
             val bitmap = mock<Bitmap>()

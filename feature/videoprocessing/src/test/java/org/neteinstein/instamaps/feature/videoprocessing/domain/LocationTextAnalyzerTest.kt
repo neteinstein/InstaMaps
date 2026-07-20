@@ -65,4 +65,19 @@ class LocationTextAnalyzerTest {
             assertEquals(1, candidates.size)
             assertTrue(candidates.single() is LocationCandidate.Coordinates)
         }
+
+    @Test
+    fun `collapses an entity-extracted address that duplicates an explicit regex match`() =
+        runTest {
+            val analyzer =
+                LocationTextAnalyzer(
+                    entityExtractionRepository = FakeEntityExtractionRepository(listOf("221b baker street, london")),
+                    locationTextParser = LocationTextParser(),
+                )
+
+            val candidates = analyzer.analyze("📍 221B Baker Street, London")
+
+            val placeNames = candidates.filterIsInstance<LocationCandidate.PlaceName>().map { it.text }
+            assertEquals(listOf("221B Baker Street, London"), placeNames)
+        }
 }
