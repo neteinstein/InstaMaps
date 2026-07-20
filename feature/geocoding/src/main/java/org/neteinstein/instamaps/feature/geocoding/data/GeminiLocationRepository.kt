@@ -29,7 +29,6 @@ class GeminiLocationRepository(
     private val settingsRepository: AppSettingsRepository,
     private val dispatcherProvider: DispatcherProvider,
 ) : LocationRepository {
-
     override suspend fun resolveFromText(text: String): Result<MapsDestination> {
         val apiKey = settingsRepository.observeGeminiApiKey().first()
         if (apiKey.isNullOrBlank()) {

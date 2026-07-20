@@ -39,7 +39,7 @@ class ProcessSharedUrlUseCase(
             }
 
             if (failedError != null) {
-                emit(ShareProcessingProgress.Failed(failedError!!))
+                emit(ShareProcessingProgress.Failed(failedError))
                 return@flow
             }
 

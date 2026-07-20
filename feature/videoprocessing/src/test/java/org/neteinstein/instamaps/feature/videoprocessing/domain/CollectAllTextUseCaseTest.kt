@@ -15,8 +15,11 @@ import org.neteinstein.instamaps.core.common.AppError
 import org.neteinstein.instamaps.core.common.DispatcherProvider
 import java.io.File
 
+// Named distinctly from ExtractLocationCandidatesUseCaseTest's own private TestDispatcherProvider
+// in this same package/file-set - Kotlin top-level classes clash across files by binary name
+// regardless of `private`, even though `private` still scopes *access* to this file.
 @OptIn(ExperimentalCoroutinesApi::class)
-private class TestDispatcherProvider(
+private class FakeDispatcherProvider(
     dispatcher: CoroutineDispatcher = UnconfinedTestDispatcher(),
 ) : DispatcherProvider {
     override val main = dispatcher
@@ -68,7 +71,7 @@ class CollectAllTextUseCaseTest {
                     frameBitmapTextPairs.mapIndexed { i, _ -> VideoFrame(i.toLong(), frameBitmapTextPairs[i].first) },
                 ),
             textRecognitionRepository = FakeTextRecognitionRepo(frameBitmapTextPairs.toMap()),
-            dispatcherProvider = TestDispatcherProvider(),
+            dispatcherProvider = FakeDispatcherProvider(),
         )
 
     @Test

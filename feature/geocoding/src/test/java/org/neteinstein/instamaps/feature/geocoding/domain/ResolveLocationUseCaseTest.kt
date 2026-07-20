@@ -1,7 +1,5 @@
 package org.neteinstein.instamaps.feature.geocoding.domain
 
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
