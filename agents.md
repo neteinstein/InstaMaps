@@ -55,8 +55,12 @@ commented out there is not compiled, tested, or linted, and should not be assume
 - **DI**: Koin (`koin-android`, `koin-androidx-compose`) - constructor injection into use cases
   and repositories, `koinViewModel()` in Compose. `InstaMapsApplication` (in `app`) is the single
   `startKoin { }` call site, wiring every feature/core module's Koin module together
-- **Video download**: yt-dlp via `youtubedl-android`, forced to `bestvideo[height<=480]+bestaudio/best[height<=480]`
-  to keep the download small and the on-device decode fast (see `YtDlpVideoDownloadRepository`)
+- **Video download**: yt-dlp via `youtubedl-android`, forced to `-f "bv*+ba/b" -S "res:480"` to keep
+  the download small and the on-device decode fast. Deliberately a format *sort* (`-S`), not a
+  *filter* (`-f ...[height<=480]`): a filter hard-eliminates every format that doesn't match, which
+  fails outright on Instagram Reels/TikTok since both serve near-universally portrait video, where
+  `height` is the *larger* dimension - `res` is yt-dlp's orientation-correct metric, "calculated as
+  the smallest dimension" (see `YtDlpVideoDownloadRepository`)
 - **Instagram authentication**: a `WebView` (`feature:instagramauth`'s `InstagramLoginScreen`) loads
   Instagram's own login page directly - InstaMaps never sees the entered password, only detects the
   resulting `sessionid` cookie via `CookieManager` once login succeeds. The cookie is encrypted at
