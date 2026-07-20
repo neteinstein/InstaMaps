@@ -4,7 +4,7 @@
 
 InstaMaps receives a shared Instagram Reel or TikTok video link from the OS share sheet,
 downloads the video on-device, extracts the location it advertises (a restaurant, a landmark, a
-store) by reading on-screen text with OCR, identifies the location via the Gemini 1.5 Flash API, and deep-links
+store) by reading on-screen text with OCR, identifies the location via the Gemini Flash API, and deep-links
 straight into Google Maps. The whole pipeline (download -> frame extraction -> OCR -> entity
 extraction -> geocoding) runs on-device; there is no backend server.
 
@@ -34,7 +34,7 @@ logic belongs in `core:common` instead.
 | `core:settings`          | domain, data, di    | `AppSettingsRepository` - persists the user-entered Gemini API key in Jetpack DataStore Preferences (covered by the app's Auto Backup, so it syncs to a user's other devices) | Active |
 | `core:instagramauth`     | domain, data, di    | `InstagramAuthRepository` - persists the Instagram session cookie captured by `feature:instagramauth`'s WebView login, encrypting it with an AndroidKeystore-backed AES-256-GCM key (`AndroidKeystoreInstagramSessionCipher`) before it touches Jetpack DataStore Preferences. Deliberately *excluded* from Auto Backup/device transfer (unlike `core:settings`) since the Keystore key never leaves the device and a restored file alone would be undecryptable - see `app`'s `data_extraction_rules.xml`/`full_backup_content.xml` | Active |
 | `feature:maps`           | domain, di          | Builds the Google Maps deep link (`BuildMapsDeepLinkUseCase`) and launches it (`MapsLauncher`, with a browser fallback if the Maps app isn't installed) | Active |
-| `feature:geocoding`      | domain, data, di    | `ResolveLocationUseCase` backed by the Gemini 1.5 Flash REST API (`GeminiLocationRepository`) - sends all collected text (caption + video OCR) to Gemini with a location-identification prompt and returns a `MapsDestination` ready for Google Maps | Active |
+| `feature:geocoding`      | domain, data, di    | `ResolveLocationUseCase` backed by the Gemini Flash REST API (`GeminiLocationRepository`) - sends all collected text (caption + video OCR) to Gemini with a location-identification prompt and returns a `MapsDestination` ready for Google Maps | Active |
 | `feature:videoprocessing`| domain, data, di    | Downloads the shared video (yt-dlp), extracts frames (`MediaMetadataRetriever`), OCRs them (ML Kit text recognition + entity extraction), turns raw text into `LocationCandidate`s. `YtDlpVideoDownloadRepository` attaches the persisted Instagram session cookie (`core:instagramauth`) to downloads when one is saved, and classifies a yt-dlp failure as `AppError.AuthenticationRequired` only when the source URL is actually an Instagram host, so a TikTok failure is never misattributed to a missing Instagram login | Active |
 | `feature:share`          | domain, presentation, work, di | Parses the shared URL, runs the video pipeline via `feature:videoprocessing`/`feature:geocoding` to resolve a `MapsDestination`, drives it from a `WorkManager` `CoroutineWorker` (survives the app being backgrounded) with a result notification, and renders an animated Compose UI (`ShareScreen`) that mirrors the same job. The idle/main screen also renders readiness warnings (missing API key, missing runtime permissions) with per-item action buttons, and gates auto-starting the pipeline on a shared video until they're resolved. It also shows a non-blocking "Connect Instagram" nudge banner when no session is saved, and reacts to an `AppError.AuthenticationRequired` failure by surfacing a dedicated login prompt (`ShareUiState.AuthRequired`) that automatically retries the same video the moment a fresh session is saved | Active |
 | `feature:settings`       | presentation, di    | The Settings screen (`SettingsScreen`/`SettingsViewModel`) the user pastes their Gemini API key into - reachable from the top-right button on `feature:share`'s main screen; delegates persistence to `core:settings` | Active |
@@ -80,7 +80,9 @@ commented out there is not compiled, tested, or linted, and should not be assume
   through a coroutine `Channel` producer/consumer pipeline so extraction never blocks on OCR
   (see `MediaMetadataRetrieverFrameExtractor`, `ExtractLocationCandidatesUseCase`)
 - **OCR / entity extraction**: Google ML Kit, on-device Text Recognition + Entity Extraction
-- **Location resolution**: Gemini 1.5 Flash REST API (via `java.net.HttpURLConnection` + `org.json`) - no additional SDK dependency
+- **Location resolution**: Gemini Flash REST API, via the `gemini-flash-latest` model alias so the
+  integration keeps working as Google retires/replaces pinned model versions (via
+  `java.net.HttpURLConnection` + `org.json`) - no additional SDK dependency
 - **Background processing**: `WorkManager` (`CoroutineWorker`) runs the download -> OCR -> geocode
   pipeline so it survives the app being backgrounded right after a share (the common case, since
   the user was just in Instagram/TikTok); progress is observed via `getWorkInfoByIdFlow` for the
@@ -99,11 +101,11 @@ commented out there is not compiled, tested, or linted, and should not be assume
 
 No build-time secrets file is required - a clean checkout compiles and runs as-is. The Gemini API
 key is entered at runtime: launch the app, tap the settings icon (top right of the main screen),
-paste in a key, and tap Save. Get a key at the
-[Google AI Studio](https://aistudio.google.com/) with Gemini 1.5 Flash enabled
-enabled. Until a key is saved, the main screen shows a warning (with a button straight to
-Settings) instead of attempting to geocode - see `feature:share`'s `ShareScreen`/`ShareViewModel`
-and `feature:settings`.
+paste in a key, and tap Save. Get a free key from
+[Google AI Studio's API key page](https://aistudio.google.com/apikey) (see the README's
+"Getting a Gemini API key" section for the full walkthrough). Until a key is saved, the main
+screen shows a warning (with a button straight to Settings) instead of attempting to geocode -
+see `feature:share`'s `ShareScreen`/`ShareViewModel` and `feature:settings`.
 
 Logging into Instagram is optional but recommended, not required to use the app: if no session is
 saved, the main screen shows a dismissible "Connect Instagram" banner (tap it to reach

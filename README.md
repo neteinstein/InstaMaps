@@ -20,7 +20,7 @@ deep link straight into Google Maps. Everything runs on-device; there is no back
    frame or walks P/B-frames).
 4. **OCR + entity extraction**: each frame goes through on-device Google ML Kit (Text Recognition,
    then Entity Extraction) to pull out addresses, place names, and location text.
-5. **Location resolution**: all collected text (caption + OCR) is sent to the Gemini 1.5 Flash API, which identifies the specific place and returns a Google Maps location.
+5. **Location resolution**: all collected text (caption + OCR) is sent to the Gemini Flash API, which identifies the specific place and returns a Google Maps location.
 6. **Deep link**: a `https://www.google.com/maps/search/?api=1&query=...` link is fired at the
    Google Maps app (falling back to a browser if Maps isn't installed).
 
@@ -31,8 +31,8 @@ tap it to jump straight into Maps.
 ## Requirements
 
 - Android 8.1+ (API 27) device or emulator.
-- A Gemini API key (Gemini 1.5 Flash enabled on Google AI Studio) - entered into
-  the app itself at runtime, not needed at build time. See [Setup](#setup).
+- A Gemini API key (free, from Google AI Studio) - entered into the app itself at runtime, not
+  needed at build time. See [Getting a Gemini API key](#getting-a-gemini-api-key).
 - An Instagram account, if you want to log in to improve download reliability for Instagram links
   - optional, not required. See [Instagram login](#instagram-login).
 
@@ -51,13 +51,31 @@ file is required, the project compiles on a clean checkout with no extra configu
 ./gradlew installDebug   # with a device/emulator connected
 ```
 
-InstaMaps needs a Gemini API key to identify locations. Get one at
-[Google AI Studio](https://aistudio.google.com/) with Gemini 1.5 Flash enabled, then open the app,
-tap the settings icon (top right of the main screen), paste the key into the Gemini API Key field,
-and tap Save. The key is stored on-device with Jetpack DataStore and included in Android's automatic
-app backup, so it carries over to your other devices/a reinstall without re-entering it. Until a key
-is saved, the main screen shows a warning with a shortcut straight to Settings instead of attempting
-to resolve the location.
+InstaMaps needs a Gemini API key to identify locations. See
+[Getting a Gemini API key](#getting-a-gemini-api-key) below, then open the app, tap the settings
+icon (top right of the main screen), paste the key into the Gemini API Key field, and tap Save.
+The key is stored on-device with Jetpack DataStore and included in Android's automatic app backup,
+so it carries over to your other devices/a reinstall without re-entering it. Until a key is saved,
+the main screen shows a warning with a shortcut straight to Settings instead of attempting to
+resolve the location.
+
+## Getting a Gemini API key
+
+InstaMaps calls the Gemini API directly from the device (no backend), so you need your own,
+free API key:
+
+1. Go to [Google AI Studio's API key page](https://aistudio.google.com/apikey).
+2. Sign in with a Google account, accept the terms if prompted, and click **Create API key**.
+3. Pick an existing Google Cloud project or let Google AI Studio create one for you - the free
+   tier is enough for personal use of InstaMaps.
+4. Copy the generated key (starts with `AIza...`).
+5. In InstaMaps, tap the settings icon (top right of the main screen), paste the key into the
+   Gemini API Key field, and tap Save.
+
+Keep the key private - anyone with it can make Gemini API calls billed to your project. InstaMaps
+stores it on-device only (Jetpack DataStore) and never sends it anywhere except directly to
+Google's Gemini API. If the key ever leaks, revoke/regenerate it from the same
+[API key page](https://aistudio.google.com/apikey) and paste the new one into Settings.
 
 ### Instagram login
 
