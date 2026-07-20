@@ -95,11 +95,11 @@ fun ShareRoute(
     viewModel: ShareViewModel = koinViewModel(),
     mapsLauncher: MapsLauncher = koinInject(),
 ) {
-    val hasPlacesApiKey by viewModel.hasPlacesApiKey.collectAsStateWithLifecycle()
+    val hasGeminiApiKey by viewModel.hasGeminiApiKey.collectAsStateWithLifecycle()
     val isInstagramAuthenticated by viewModel.isInstagramAuthenticated.collectAsStateWithLifecycle()
     val permissionStates = requiredRuntimePermissions().map { rememberRuntimePermissionState(it) }
     val missingPermissions = permissionStates.filter { it.status != RuntimePermissionStatus.GRANTED }
-    val isReady = hasPlacesApiKey == true && missingPermissions.isEmpty()
+    val isReady = hasGeminiApiKey == true && missingPermissions.isEmpty()
 
     LaunchedEffect(sharedText, isReady) {
         if (sharedText != null && isReady) {
@@ -111,7 +111,7 @@ fun ShareRoute(
     ShareScreen(
         uiState = uiState,
         onOpenMaps = { mapsLauncher.launch(it) },
-        showApiKeyWarning = hasPlacesApiKey == false,
+        showApiKeyWarning = hasGeminiApiKey == false,
         missingPermissions = missingPermissions,
         showInstagramConnectWarning = isInstagramAuthenticated == false,
         onOpenSettings = onOpenSettings,

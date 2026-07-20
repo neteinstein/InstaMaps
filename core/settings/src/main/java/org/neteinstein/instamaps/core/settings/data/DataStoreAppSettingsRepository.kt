@@ -21,7 +21,7 @@ import java.io.IOException
 class DataStoreAppSettingsRepository(
     private val dataStore: DataStore<Preferences>,
 ) : AppSettingsRepository {
-    override fun observePlacesApiKey(): Flow<String?> =
+    override fun observeGeminiApiKey(): Flow<String?> =
         dataStore.data
             // DataStore's `data` Flow can throw on a corrupted/unreadable file - treat that the
             // same as "nothing saved yet" rather than crashing the collector (the main screen's
@@ -29,20 +29,20 @@ class DataStoreAppSettingsRepository(
             .catch { exception ->
                 if (exception is IOException) emit(emptyPreferences()) else throw exception
             }
-            .map { preferences -> preferences[PLACES_API_KEY]?.takeIf { it.isNotBlank() } }
+            .map { preferences -> preferences[GEMINI_API_KEY]?.takeIf { it.isNotBlank() } }
 
-    override suspend fun savePlacesApiKey(apiKey: String) {
+    override suspend fun saveGeminiApiKey(apiKey: String) {
         val trimmed = apiKey.trim()
         dataStore.edit { preferences ->
             if (trimmed.isEmpty()) {
-                preferences.remove(PLACES_API_KEY)
+                preferences.remove(GEMINI_API_KEY)
             } else {
-                preferences[PLACES_API_KEY] = trimmed
+                preferences[GEMINI_API_KEY] = trimmed
             }
         }
     }
 
     private companion object {
-        val PLACES_API_KEY: Preferences.Key<String> = stringPreferencesKey("places_api_key")
+        val GEMINI_API_KEY: Preferences.Key<String> = stringPreferencesKey("gemini_api_key")
     }
 }

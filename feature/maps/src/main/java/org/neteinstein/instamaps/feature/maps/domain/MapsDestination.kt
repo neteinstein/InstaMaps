@@ -5,8 +5,8 @@ package org.neteinstein.instamaps.feature.maps.domain
  *
  * [query] is the human-readable text Maps falls back to if [placeId] can't be resolved
  * (e.g. the place name, or a "lat,lng" string) and must never be blank. [placeId] is the
- * precise Places SDK identifier (`Place.id`) when geocoding succeeded; when null, Maps
- * performs a text search using [query] alone.
+ * precise place identifier when available; when null, Maps performs a text search using
+ * [query] alone.
  */
 data class MapsDestination(
     val query: String,

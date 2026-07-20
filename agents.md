@@ -4,7 +4,7 @@
 
 InstaMaps receives a shared Instagram Reel or TikTok video link from the OS share sheet,
 downloads the video on-device, extracts the location it advertises (a restaurant, a landmark, a
-store) by reading on-screen text with OCR, geocodes it with the Places SDK, and deep-links
+store) by reading on-screen text with OCR, identifies the location via the Gemini 1.5 Flash API, and deep-links
 straight into Google Maps. The whole pipeline (download -> frame extraction -> OCR -> entity
 extraction -> geocoding) runs on-device; there is no backend server.
 
@@ -17,7 +17,7 @@ module is internally layered as:
   framework or third-party SDK types leak into this layer - it must stay unit-testable with
   plain JUnit and no mocking framework required.
 - **`data/`**: repository implementations that call into a specific SDK/framework
-  (`MediaMetadataRetriever`, ML Kit, Places SDK, yt-dlp).
+  (`MediaMetadataRetriever`, ML Kit, Gemini API, yt-dlp).
 - **`di/`**: a Koin `module { }` wiring the module's use cases and repositories together.
 - Compose UI + ViewModel, for modules that own a screen.
 
@@ -31,13 +31,13 @@ logic belongs in `core:common` instead.
 |--------------------------|---------------------|------------------------------------------------------------------------------------------------------------|--------|
 | `core:common`            | domain, di          | `AppError`, `DispatcherProvider`, `LatLng`, `safeCall` - shared primitives used across every module         | Active |
 | `core:designsystem`      | Compose UI, theme   | Shared Compose theme/typography + reusable components (`PrimaryButton`, `LoadingIndicator`, `ErrorMessage`, `WarningBanner`) | Active |
-| `core:settings`          | domain, data, di    | `AppSettingsRepository` - persists the user-entered Places API key in Jetpack DataStore Preferences (covered by the app's Auto Backup, so it syncs to a user's other devices) | Active |
+| `core:settings`          | domain, data, di    | `AppSettingsRepository` - persists the user-entered Gemini API key in Jetpack DataStore Preferences (covered by the app's Auto Backup, so it syncs to a user's other devices) | Active |
 | `core:instagramauth`     | domain, data, di    | `InstagramAuthRepository` - persists the Instagram session cookie captured by `feature:instagramauth`'s WebView login, encrypting it with an AndroidKeystore-backed AES-256-GCM key (`AndroidKeystoreInstagramSessionCipher`) before it touches Jetpack DataStore Preferences. Deliberately *excluded* from Auto Backup/device transfer (unlike `core:settings`) since the Keystore key never leaves the device and a restored file alone would be undecryptable - see `app`'s `data_extraction_rules.xml`/`full_backup_content.xml` | Active |
 | `feature:maps`           | domain, di          | Builds the Google Maps deep link (`BuildMapsDeepLinkUseCase`) and launches it (`MapsLauncher`, with a browser fallback if the Maps app isn't installed) | Active |
-| `feature:geocoding`      | domain, data, di    | `SearchPlaceUseCase` against the Places SDK (`PlacesSdkPlaceSearchRepository`), which lazily (re)initializes the SDK from `core:settings`'s current API key on every call instead of a build-time constant | Active |
+| `feature:geocoding`      | domain, data, di    | `ResolveLocationUseCase` backed by the Gemini 1.5 Flash REST API (`GeminiLocationRepository`) - sends all collected text (caption + video OCR) to Gemini with a location-identification prompt and returns a `MapsDestination` ready for Google Maps | Active |
 | `feature:videoprocessing`| domain, data, di    | Downloads the shared video (yt-dlp), extracts frames (`MediaMetadataRetriever`), OCRs them (ML Kit text recognition + entity extraction), turns raw text into `LocationCandidate`s. `YtDlpVideoDownloadRepository` attaches the persisted Instagram session cookie (`core:instagramauth`) to downloads when one is saved, and classifies a yt-dlp failure as `AppError.AuthenticationRequired` only when the source URL is actually an Instagram host, so a TikTok failure is never misattributed to a missing Instagram login | Active |
 | `feature:share`          | domain, presentation, work, di | Parses the shared URL, runs the video pipeline via `feature:videoprocessing`/`feature:geocoding` to resolve a `MapsDestination`, drives it from a `WorkManager` `CoroutineWorker` (survives the app being backgrounded) with a result notification, and renders an animated Compose UI (`ShareScreen`) that mirrors the same job. The idle/main screen also renders readiness warnings (missing API key, missing runtime permissions) with per-item action buttons, and gates auto-starting the pipeline on a shared video until they're resolved. It also shows a non-blocking "Connect Instagram" nudge banner when no session is saved, and reacts to an `AppError.AuthenticationRequired` failure by surfacing a dedicated login prompt (`ShareUiState.AuthRequired`) that automatically retries the same video the moment a fresh session is saved | Active |
-| `feature:settings`       | presentation, di    | The Settings screen (`SettingsScreen`/`SettingsViewModel`) the user pastes their Places API key into - reachable from the top-right button on `feature:share`'s main screen; delegates persistence to `core:settings` | Active |
+| `feature:settings`       | presentation, di    | The Settings screen (`SettingsScreen`/`SettingsViewModel`) the user pastes their Gemini API key into - reachable from the top-right button on `feature:share`'s main screen; delegates persistence to `core:settings` | Active |
 | `feature:instagramauth`  | presentation, di    | The Instagram login screen (`InstagramLoginScreen`/`InstagramLoginViewModel`): a `WebView` pointed at Instagram's own login page - InstaMaps never sees the entered password, only detects the `sessionid` cookie once login succeeds, then hands it to `core:instagramauth` to persist | Active |
 | `app`                    | presentation        | Composition root: `InstaMapsApplication` starts Koin with every feature/core module; `MainActivity` is the single UI entry point, handling launcher taps, the Instagram/TikTok share target, the result-notification deep-link trampoline into `MapsLauncher`, and switching between the main (`feature:share`), Settings (`feature:settings`), and Instagram login (`feature:instagramauth`) screens | Active |
 
@@ -80,7 +80,7 @@ commented out there is not compiled, tested, or linted, and should not be assume
   through a coroutine `Channel` producer/consumer pipeline so extraction never blocks on OCR
   (see `MediaMetadataRetrieverFrameExtractor`, `ExtractLocationCandidatesUseCase`)
 - **OCR / entity extraction**: Google ML Kit, on-device Text Recognition + Entity Extraction
-- **Geocoding**: Google Places SDK for Android
+- **Location resolution**: Gemini 1.5 Flash REST API (via `java.net.HttpURLConnection` + `org.json`) - no additional SDK dependency
 - **Background processing**: `WorkManager` (`CoroutineWorker`) runs the download -> OCR -> geocode
   pipeline so it survives the app being backgrounded right after a share (the common case, since
   the user was just in Instagram/TikTok); progress is observed via `getWorkInfoByIdFlow` for the
@@ -88,7 +88,7 @@ commented out there is not compiled, tested, or linted, and should not be assume
   regardless of whether the app is still in the foreground (see `ProcessSharedUrlWorker`,
   `ShareNotifier`, `ShareViewModel`)
 - **Settings persistence**: Jetpack DataStore Preferences (`core:settings`) stores the
-  user-entered Places API key under the app's `filesDir`, covered by the manifest's existing
+  user-entered Gemini API key under the app's `filesDir`, covered by the manifest's existing
   `android:allowBackup="true"` Auto Backup - no separate sync/backup plumbing needed for it to
   carry over to a user's other devices
 - **Testing**: JUnit 4, Mockito-Kotlin, `kotlinx-coroutines-test`
@@ -97,10 +97,10 @@ commented out there is not compiled, tested, or linted, and should not be assume
 
 ## Development Setup
 
-No build-time secrets file is required - a clean checkout compiles and runs as-is. The Places API
+No build-time secrets file is required - a clean checkout compiles and runs as-is. The Gemini API
 key is entered at runtime: launch the app, tap the settings icon (top right of the main screen),
 paste in a key, and tap Save. Get a key at the
-[Google Cloud Console](https://console.cloud.google.com/google/maps-apis) with "Places API (New)"
+[Google AI Studio](https://aistudio.google.com/) with Gemini 1.5 Flash enabled
 enabled. Until a key is saved, the main screen shows a warning (with a button straight to
 Settings) instead of attempting to geocode - see `feature:share`'s `ShareScreen`/`ShareViewModel`
 and `feature:settings`.
@@ -163,11 +163,11 @@ exact video the moment a fresh session is saved - see `feature:share`'s `ShareVi
 
 - ktlint runs on every module (`ktlintCheck` in CI, blocking). Run `ktlintFormat` before
   committing instead of hand-fixing style issues.
-- Before writing code against a third-party library/SDK (Koin, ML Kit, Places SDK, yt-dlp,
+- Before writing code against a third-party library/SDK (Koin, ML Kit, Gemini API, yt-dlp,
   AndroidX/Compose), verify the real API surface first - decompile the resolved artifact or read
   real source at the exact version in use, rather than relying on a recalled API shape. Library
   APIs shift between versions often enough that this has repeatedly caught real mismatches during
-  this project's build-out (e.g. Places SDK's real `Place.Field.DISPLAY_NAME` vs. the commonly
+  this project's build-out (e.g. Gemini API model names, ML Kit entity extraction options, yt-dlp format strings). Library
   assumed `Place.Field.NAME`).
 - Prefer constructor injection and interfaces at layer boundaries (`domain` defines the
   repository interface, `data` implements it) so use cases can be unit-tested with fakes instead
@@ -207,7 +207,7 @@ tagged `v1.0.<run number>`. `versionCode`/`versionName` are overridden at build 
 `APP_VERSION_CODE`/`APP_VERSION_NAME` env vars derived from the run number (see the
 `signingConfigs`/`defaultConfig` blocks in `app/build.gradle.kts`). All four secrets are required;
 the workflow fails fast if any are missing rather than shipping an unsigned or non-functional
-build. The Places API key is not part of this workflow - it's a runtime, user-entered value (see
+build. The Gemini API key is not part of this workflow - it is a runtime, user-entered value (see
 Development Setup), not a build-time secret. The built APK is renamed to
 `InstaMaps_version<version>.apk` (dots replaced with underscores, e.g.
 `InstaMaps_version1_0_42.apk`) before being uploaded as the release asset, and the APK's SHA-1

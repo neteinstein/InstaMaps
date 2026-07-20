@@ -39,30 +39,30 @@ class DataStoreAppSettingsRepositoryTest {
     }
 
     @Test
-    fun `observePlacesApiKey emits null before anything is saved`() =
+    fun `observeGeminiApiKey emits null before anything is saved`() =
         runTest {
-            repository.observePlacesApiKey().test {
+            repository.observeGeminiApiKey().test {
                 assertEquals(null, awaitItem())
             }
         }
 
     @Test
-    fun `savePlacesApiKey persists a trimmed key`() =
+    fun `saveGeminiApiKey persists a trimmed key`() =
         runTest {
-            repository.savePlacesApiKey("  AIzaSyExample  ")
+            repository.saveGeminiApiKey("  AIzaSyExample  ")
 
-            repository.observePlacesApiKey().test {
+            repository.observeGeminiApiKey().test {
                 assertEquals("AIzaSyExample", awaitItem())
             }
         }
 
     @Test
-    fun `savePlacesApiKey with a blank value clears a previously saved key`() =
+    fun `saveGeminiApiKey with a blank value clears a previously saved key`() =
         runTest {
-            repository.savePlacesApiKey("AIzaSyExample")
-            repository.savePlacesApiKey("   ")
+            repository.saveGeminiApiKey("AIzaSyExample")
+            repository.saveGeminiApiKey("   ")
 
-            repository.observePlacesApiKey().test {
+            repository.observeGeminiApiKey().test {
                 assertEquals(null, awaitItem())
             }
         }

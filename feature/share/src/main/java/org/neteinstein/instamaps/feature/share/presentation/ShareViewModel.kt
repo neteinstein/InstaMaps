@@ -18,7 +18,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import org.neteinstein.instamaps.core.instagramauth.domain.ObserveInstagramAuthStateUseCase
-import org.neteinstein.instamaps.core.settings.domain.IsPlacesApiKeyConfiguredUseCase
+import org.neteinstein.instamaps.core.settings.domain.IsGeminiApiKeyConfiguredUseCase
 import org.neteinstein.instamaps.feature.maps.domain.MapsDestination
 import org.neteinstein.instamaps.feature.share.domain.ParseSharedTextUseCase
 import org.neteinstein.instamaps.feature.share.work.ProcessSharedUrlWorker
@@ -33,7 +33,7 @@ import org.neteinstein.instamaps.feature.share.work.ProcessSharedUrlWorker
 class ShareViewModel(
     private val context: Context,
     private val parseSharedTextUseCase: ParseSharedTextUseCase,
-    private val isPlacesApiKeyConfiguredUseCase: IsPlacesApiKeyConfiguredUseCase,
+    private val isGeminiApiKeyConfiguredUseCase: IsGeminiApiKeyConfiguredUseCase,
     private val observeInstagramAuthStateUseCase: ObserveInstagramAuthStateUseCase,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow<ShareUiState>(ShareUiState.Idle)
@@ -46,13 +46,13 @@ class ShareViewModel(
      * eagerly (not just while the UI observes it) so the value is already current by the time the
      * user comes back from the Settings screen.
      */
-    val hasPlacesApiKey: StateFlow<Boolean?> =
-        isPlacesApiKeyConfiguredUseCase()
+    val hasGeminiApiKey: StateFlow<Boolean?> =
+        isGeminiApiKeyConfiguredUseCase()
             .map { hasKey -> hasKey as Boolean? }
             .stateIn(viewModelScope, SharingStarted.Eagerly, initialValue = null)
 
     /**
-     * `null`/`false` distinction mirrors [hasPlacesApiKey]. Collected eagerly so
+     * `null`/`false` distinction mirrors [hasGeminiApiKey]. Collected eagerly so
      * [retryIfAuthRequiredPending] fires the moment the user logs back in via
      * `feature:instagramauth`, even though [ShareRoute] isn't composed (and therefore isn't
      * observing anything) while that login screen is on top.

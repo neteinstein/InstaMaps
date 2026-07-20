@@ -20,7 +20,7 @@ deep link straight into Google Maps. Everything runs on-device; there is no back
    frame or walks P/B-frames).
 4. **OCR + entity extraction**: each frame goes through on-device Google ML Kit (Text Recognition,
    then Entity Extraction) to pull out addresses, place names, and location text.
-5. **Geocoding**: the best candidate is resolved to a real place with the Google Places SDK.
+5. **Location resolution**: all collected text (caption + OCR) is sent to the Gemini 1.5 Flash API, which identifies the specific place and returns a Google Maps location.
 6. **Deep link**: a `https://www.google.com/maps/search/?api=1&query=...` link is fired at the
    Google Maps app (falling back to a browser if Maps isn't installed).
 
@@ -31,7 +31,7 @@ tap it to jump straight into Maps.
 ## Requirements
 
 - Android 8.1+ (API 27) device or emulator.
-- A Google Places API key (**Places API (New)** enabled on a Google Cloud project) - entered into
+- A Gemini API key (Gemini 1.5 Flash enabled on Google AI Studio) - entered into
   the app itself at runtime, not needed at build time. See [Setup](#setup).
 - An Instagram account, if you want to log in to improve download reliability for Instagram links
   - optional, not required. See [Instagram login](#instagram-login).
@@ -51,13 +51,13 @@ file is required, the project compiles on a clean checkout with no extra configu
 ./gradlew installDebug   # with a device/emulator connected
 ```
 
-InstaMaps needs a Google Places API key to geocode anything. Get one at the
-[Google Cloud Console](https://console.cloud.google.com/google/maps-apis) with the
-**Places API (New)** enabled, then open the app, tap the settings icon (top right of the main
-screen), paste the key into the Places API Key field, and tap Save. The key is stored on-device
-with Jetpack DataStore and included in Android's automatic app backup, so it carries over to your
-other devices/a reinstall without re-entering it. Until a key is saved, the main screen shows a
-warning with a shortcut straight to Settings instead of attempting to geocode.
+InstaMaps needs a Gemini API key to identify locations. Get one at
+[Google AI Studio](https://aistudio.google.com/) with Gemini 1.5 Flash enabled, then open the app,
+tap the settings icon (top right of the main screen), paste the key into the Gemini API Key field,
+and tap Save. The key is stored on-device with Jetpack DataStore and included in Android's automatic
+app backup, so it carries over to your other devices/a reinstall without re-entering it. Until a key
+is saved, the main screen shows a warning with a shortcut straight to Settings instead of attempting
+to resolve the location.
 
 ### Instagram login
 
@@ -67,7 +67,7 @@ but improves reliability, since Instagram rate-limits and occasionally blocks an
 banner; tapping it opens a screen with a real `WebView` pointed at Instagram's own login page.
 InstaMaps never sees the password you type - it only detects the session cookie Instagram sets
 once login succeeds, encrypts it on-device (AndroidKeystore-backed AES-256-GCM), and stores it
-separately from your Places API key, deliberately left out of Android's backup/device-transfer
+separately from your Gemini API key, deliberately left out of Android's backup/device-transfer
 so a restored copy on another device (where the encryption key wouldn't exist) can't leave a
 broken, undecryptable session behind.
 
@@ -83,7 +83,7 @@ retries that exact video as soon as you log in again.
    once the place is found.
 4. Tap the notification (or wait for the in-app auto-open) to land on the pin in Google Maps.
 
-If the Places API key or a required runtime permission is missing, InstaMaps opens to the main
+If the Gemini API key or a required runtime permission is missing, InstaMaps opens to the main
 screen instead of processing the video, showing a warning per missing item with a button to fix
 it (jump to Settings, grant the permission, or open the system app-settings page if it was
 previously denied). Once everything's in place, sharing the same video again - or just waiting,
@@ -105,7 +105,7 @@ is renamed to `InstaMaps_version<version>.apk` (dots replaced with underscores, 
 `InstaMaps_version1_0_42.apk`), and its SHA-1 checksum is prepended to the release notes.
 
 The workflow requires these repository secrets (**Settings → Secrets and variables → Actions**),
-all needed only for signing the release APK - the Places API key is no longer a build-time secret,
+all needed only for signing the release APK - the Gemini API key is not a build-time secret,
 see [Setup](#setup):
 
 | Secret              | Value                                                                                |

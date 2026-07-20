@@ -41,12 +41,11 @@ ktlint {
 dependencies {
     implementation(project(":core:common"))
     implementation(project(":core:settings"))
+    implementation(project(":feature:maps"))
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.koin.android)
     implementation(libs.kotlinx.coroutines.android)
-    implementation(libs.kotlinx.coroutines.play.services)
-    implementation(libs.places)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)

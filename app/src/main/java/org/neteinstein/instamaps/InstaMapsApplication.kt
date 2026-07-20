@@ -16,7 +16,7 @@ import org.neteinstein.instamaps.feature.videoprocessing.di.videoProcessingModul
 
 /**
  * Composition root: starts Koin once, wiring every feature/core module's DI graph together. The
- * Places API key is no longer build-time (`BuildConfig`) - it's read at runtime from
+ * Gemini API key is entered at runtime from
  * `core:settings`'s DataStore-backed repository, populated by the user on the Settings screen
  * (`feature:settings`), so [settingsModule] must be present before [geocodingModule]/[shareModule]
  * (which both depend on it) resolve their dependencies. Likewise [instagramAuthModule] must be

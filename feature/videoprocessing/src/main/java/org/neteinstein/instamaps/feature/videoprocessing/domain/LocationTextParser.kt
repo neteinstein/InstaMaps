@@ -23,7 +23,7 @@ import org.neteinstein.instamaps.core.common.LatLng
  *    non-name sentence opener - see [extractCapitalizedPhrases]. This is the last-resort signal:
  *    many captions/overlays simply name the place with no marker, hashtag, or address at all, so
  *    rather than giving up, the plain-text guess most likely to be a name is still worth trying
- *    against the Places SDK's own fuzzy text search.
+ *    as a geocoding query.
  */
 class LocationTextParser {
     fun parse(text: String): List<LocationCandidate> {
@@ -66,7 +66,7 @@ class LocationTextParser {
             // A single capitalized word is a much weaker place-name signal than a multi-word
             // camelCase hashtag (e.g. #Dishoom vs #NewYorkCity) - it's just as likely to be a
             // generic tag someone happened to capitalize, so it's worth filtering the common ones
-            // out rather than trying them all against the Places SDK.
+            // out rather than passing them all to Gemini.
             if (!isMultiWord && spaced.lowercase() in GENERIC_HASHTAGS) return@mapNotNull null
 
             val confidence = if (isMultiWord) HASHTAG_CAMEL_CASE_CONFIDENCE else HASHTAG_SINGLE_WORD_CONFIDENCE
@@ -80,7 +80,7 @@ class LocationTextParser {
      * stylized in one case or the other. Deliberately simple (no real NLP/NER model on-device) -
      * it will occasionally pick up a menu item or a generic phrase, but that's an acceptable
      * trade-off for a fallback that otherwise finds nothing at all - this tier's low confidence
-     * means it's only ever tried after every stronger signal has failed, and the Places SDK's
+     * means it's only ever tried after every stronger signal has failed, and Gemini's
      * own fuzzy text search does the rest of the work of turning "a likely name" into a real
      * result.
      */
@@ -115,7 +115,7 @@ class LocationTextParser {
         const val HASHTAG_SINGLE_WORD_CONFIDENCE = 0.35f
 
         // Not exhaustive - just the sentence openers/fillers common enough in social captions to
-        // be worth filtering before they're tried against the Places SDK as a "place name".
+        // be worth filtering before they are sent to Gemini as a "place name".
         val LEADING_STOPWORDS =
             setOf(
                 "this", "that", "these", "those", "the", "a", "an", "best", "great", "amazing",
@@ -127,7 +127,7 @@ class LocationTextParser {
             )
 
         // Not exhaustive - just the generic single-word hashtags common enough in food/travel
-        // content to be worth filtering before they're tried against the Places SDK as a "place
+        // content to be worth filtering before they are sent to Gemini as a "place
         // name" on their own (unlike a multi-word camelCase hashtag, a single word is a weak
         // enough signal that these false positives aren't worth the wasted search).
         val GENERIC_HASHTAGS =

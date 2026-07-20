@@ -18,9 +18,8 @@ val shareModule =
         factory { ParseSharedTextUseCase() }
         factory {
             ProcessSharedUrlUseCase(
-                extractLocationCandidatesFromDescriptionUseCase = get(),
-                extractLocationCandidatesUseCase = get(),
-                searchPlaceUseCase = get(),
+                collectAllTextUseCase = get(),
+                resolveLocationUseCase = get(),
             )
         }
         single { ShareNotifier(context = androidContext()) }
@@ -28,7 +27,7 @@ val shareModule =
             ShareViewModel(
                 context = androidContext(),
                 parseSharedTextUseCase = get(),
-                isPlacesApiKeyConfiguredUseCase = get(),
+                isGeminiApiKeyConfiguredUseCase = get(),
                 observeInstagramAuthStateUseCase = get(),
             )
         }
