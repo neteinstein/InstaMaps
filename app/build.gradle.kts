@@ -28,6 +28,23 @@ android {
         compose = true
     }
 
+    // youtubedl-android bundles its Python runtime as "libpython.zip.so" - a zip archive given a
+    // .so extension purely so Gradle packages it alongside real native libraries instead of as a
+    // compressed asset. YoutubeDL.initPython() then opens that file directly from
+    // ApplicationInfo.nativeLibraryDir via a plain RandomAccessFile, which only exists on disk if
+    // native libs are actually extracted at install time. Since minSdk (27) is >= 23, AGP's
+    // default (no explicit useLegacyPackaging) keeps .so files uncompressed-but-unextracted inside
+    // the APK for direct dlopen instead, so that path never exists - crashing every share (not
+    // just TikTok) with "libpython.zip.so: open failed: ENOENT" on first download. Forcing legacy
+    // packaging restores real on-disk extraction. This must be set here via the Gradle DSL, not
+    // via android:extractNativeLibs in the manifest - AGP 4.2+ ignores/overwrites that manifest
+    // attribute in favor of this setting. See https://github.com/yausername/youtubedl-android.
+    packaging {
+        jniLibs {
+            useLegacyPackaging = true
+        }
+    }
+
     // Populated by .github/workflows/release.yml from Action secrets (KEYSTORE_BASE64 decoded to
     // a file + KEYSTORE_PASSWORD/KEY_ALIAS/KEY_PASSWORD) so the release workflow can produce a
     // signed APK. Left unset for local builds - see the release buildType below for the fallback.
