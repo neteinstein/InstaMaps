@@ -11,11 +11,13 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
+import org.neteinstein.instamaps.core.instagramauth.domain.ObserveInstagramAuthStateUseCase
 import org.neteinstein.instamaps.core.settings.domain.IsPlacesApiKeyConfiguredUseCase
 import org.neteinstein.instamaps.feature.maps.domain.MapsDestination
 import org.neteinstein.instamaps.feature.share.domain.ParseSharedTextUseCase
@@ -32,6 +34,7 @@ class ShareViewModel(
     private val context: Context,
     private val parseSharedTextUseCase: ParseSharedTextUseCase,
     private val isPlacesApiKeyConfiguredUseCase: IsPlacesApiKeyConfiguredUseCase,
+    private val observeInstagramAuthStateUseCase: ObserveInstagramAuthStateUseCase,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow<ShareUiState>(ShareUiState.Idle)
     val uiState: StateFlow<ShareUiState> = _uiState.asStateFlow()
@@ -48,7 +51,28 @@ class ShareViewModel(
             .map { hasKey -> hasKey as Boolean? }
             .stateIn(viewModelScope, SharingStarted.Eagerly, initialValue = null)
 
+    /**
+     * `null`/`false` distinction mirrors [hasPlacesApiKey]. Collected eagerly so
+     * [retryIfAuthRequiredPending] fires the moment the user logs back in via
+     * `feature:instagramauth`, even though [ShareRoute] isn't composed (and therefore isn't
+     * observing anything) while that login screen is on top.
+     */
+    val isInstagramAuthenticated: StateFlow<Boolean?> =
+        observeInstagramAuthStateUseCase()
+            .map { isAuthenticated -> isAuthenticated as Boolean? }
+            .stateIn(viewModelScope, SharingStarted.Eagerly, initialValue = null)
+
     private var observerJob: Job? = null
+
+    init {
+        // ProcessSharedUrlWorker already cleared the stale session by the time uiState becomes
+        // AuthRequired (see its toFailureWorkData) - the moment a fresh one is saved, resume the
+        // exact URL that failed instead of leaving the user to re-share the same video by hand.
+        isInstagramAuthenticated
+            .filter { isAuthenticated -> isAuthenticated == true }
+            .onEach { retryIfAuthRequiredPending() }
+            .launchIn(viewModelScope)
+    }
 
     fun onSharedTextReceived(sharedText: String) {
         val parsed = parseSharedTextUseCase(sharedText)
@@ -56,13 +80,30 @@ class ShareViewModel(
             _uiState.value = ShareUiState.Error("No video link was found in the shared text")
             return
         }
+        enqueueProcessing(parsed.url)
+    }
 
+    /** Dismisses [ShareUiState.AuthRequired] without logging in, returning to the main screen. */
+    fun dismissAuthRequired() {
+        if (_uiState.value is ShareUiState.AuthRequired) {
+            _uiState.value = ShareUiState.Idle
+        }
+    }
+
+    private fun retryIfAuthRequiredPending() {
+        val pending = _uiState.value
+        if (pending is ShareUiState.AuthRequired) {
+            enqueueProcessing(pending.url)
+        }
+    }
+
+    // A new share always wins over whatever the UI was showing for a previous one - each
+    // share still runs to completion as its own independent Worker (see
+    // ProcessSharedUrlWorker.enqueue), only the UI's attention moves to the latest request.
+    private fun enqueueProcessing(url: String) {
         _uiState.value = ShareUiState.Processing(ProcessingStage.CHECKING_DESCRIPTION)
-        val request = ProcessSharedUrlWorker.enqueue(context, parsed.url)
+        val request = ProcessSharedUrlWorker.enqueue(context, url)
 
-        // A new share always wins over whatever the UI was showing for a previous one - each
-        // share still runs to completion as its own independent Worker (see
-        // ProcessSharedUrlWorker.enqueue), only the UI's attention moves to the latest request.
         observerJob?.cancel()
         observerJob =
             WorkManager.getInstance(context)
@@ -104,6 +145,10 @@ class ShareViewModel(
 
     private fun Data.toFailedUiState(): ShareUiState {
         val message = getString(ProcessSharedUrlWorker.KEY_ERROR_MESSAGE) ?: "Something went wrong"
+        val url = getString(ProcessSharedUrlWorker.KEY_URL)
+        if (getBoolean(ProcessSharedUrlWorker.KEY_AUTH_REQUIRED, false) && url != null) {
+            return ShareUiState.AuthRequired(message = message, url = url)
+        }
         val notFound = getBoolean(ProcessSharedUrlWorker.KEY_NOT_FOUND, false)
         return if (notFound) ShareUiState.NotFound(message) else ShareUiState.Error(message)
     }

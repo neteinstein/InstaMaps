@@ -17,11 +17,13 @@ dependencies {
     kover(project(":core:common"))
     kover(project(":core:designsystem"))
     kover(project(":core:settings"))
+    kover(project(":core:instagramauth"))
     kover(project(":feature:maps"))
     kover(project(":feature:geocoding"))
     kover(project(":feature:videoprocessing"))
     kover(project(":feature:share"))
     kover(project(":feature:settings"))
+    kover(project(":feature:instagramauth"))
     // :app is intentionally excluded: it is a pure composition root (Application class + a single
     // trampoline Activity wiring Koin/manifest intent-filters together) with no domain/data logic
     // of its own to cover - the same rationale as the `*.di`/`*.presentation`/`*.work` excludes

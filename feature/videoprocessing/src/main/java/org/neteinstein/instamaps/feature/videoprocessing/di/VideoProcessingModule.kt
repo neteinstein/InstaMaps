@@ -32,7 +32,11 @@ val videoProcessingModule =
         // plain get<Context>()) to match the pattern already established in
         // feature:geocoding's Koin module.
         single<VideoDownloadRepository> {
-            YtDlpVideoDownloadRepository(context = androidContext(), dispatcherProvider = get())
+            YtDlpVideoDownloadRepository(
+                context = androidContext(),
+                dispatcherProvider = get(),
+                instagramAuthRepository = get(),
+            )
         }
         single<VideoMetadataRepository> {
             YtDlpVideoMetadataRepository(context = androidContext(), dispatcherProvider = get())

@@ -40,6 +40,7 @@ ktlint {
 
 dependencies {
     implementation(project(":core:common"))
+    implementation(project(":core:instagramauth"))
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.koin.android)

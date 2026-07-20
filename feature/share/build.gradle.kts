@@ -47,6 +47,7 @@ dependencies {
     implementation(project(":core:common"))
     implementation(project(":core:designsystem"))
     implementation(project(":core:settings"))
+    implementation(project(":core:instagramauth"))
     implementation(project(":feature:videoprocessing"))
     implementation(project(":feature:geocoding"))
     implementation(project(":feature:maps"))

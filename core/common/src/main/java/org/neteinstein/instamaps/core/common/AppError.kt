@@ -19,5 +19,14 @@ sealed class AppError(override val message: String, override val cause: Throwabl
 
     class PlatformUnavailable(message: String, cause: Throwable? = null) : AppError(message, cause)
 
+    /**
+     * A request needs an authenticated session that's either missing or no longer accepted -
+     * currently only raised by `feature:videoprocessing`'s yt-dlp download when Instagram demands
+     * a login (see `YtDlpVideoDownloadRepository`). Kept distinct from [Network] so callers (e.g.
+     * `feature:share`'s `ProcessSharedUrlWorker`) can route the user back to the Instagram login
+     * screen instead of showing a generic error.
+     */
+    class AuthenticationRequired(message: String, cause: Throwable? = null) : AppError(message, cause)
+
     class Unknown(message: String = "Something went wrong", cause: Throwable? = null) : AppError(message, cause)
 }
