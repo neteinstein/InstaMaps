@@ -3,7 +3,7 @@
     <string name="settings_title">Settings</string>
     <string name="settings_back">Back</string>
     <string name="settings_api_key_label">Gemini API key</string>
-    <string name="settings_api_key_supporting_text">Required for InstaMaps to identify locations. Get a key from Google AI Studio (Gemini API) and enable Gemini 1.5 Flash.</string>
+    <string name="settings_api_key_supporting_text">Required for InstaMaps to identify locations. Get a free key from Google AI Studio (aistudio.google.com/apikey).</string>
     <string name="settings_save">Save</string>
     <string name="settings_saved_confirmation">Saved</string>
 </resources>

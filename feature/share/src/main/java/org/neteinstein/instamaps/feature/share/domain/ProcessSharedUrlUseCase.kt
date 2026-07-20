@@ -12,7 +12,7 @@ import org.neteinstein.instamaps.feature.videoprocessing.domain.CollectAllTextUs
  * 1. Fetches the shared video's caption/description (fast metadata-only fetch).
  * 2. Downloads the video and OCRs every extracted frame to collect all on-screen text.
  * 3. Sends the combined text (caption + all frame OCR) to [resolveLocationUseCase], which calls
- *    the Gemini 1.5 Flash API with the prompt:
+ *    the Gemini Flash API with the prompt:
  *    "these are caption and text from a video that talks about a specific place. from those
  *    determine the place and return Google maps location"
  * 4. Emits [ShareProcessingProgress.Found] with the resolved [MapsDestination] on success, or

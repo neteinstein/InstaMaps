@@ -15,7 +15,7 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 /**
- * [LocationRepository] backed by the Gemini 1.5 Flash REST API. Sends all collected text
+ * [LocationRepository] backed by the Gemini Flash REST API. Sends all collected text
  * (video caption + OCR frames) as a single prompt and parses the response as a Google Maps
  * query string ([MapsDestination.query]).
  *
@@ -117,8 +117,11 @@ class GeminiLocationRepository(
     }
 
     private companion object {
+        // "gemini-flash-latest" is a Google-maintained alias that always resolves to the current
+        // stable Flash model, so this doesn't need to be bumped by hand every time Google retires
+        // a pinned model version (e.g. gemini-1.5-flash was retired, breaking this integration).
         const val GEMINI_API_URL =
-            "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
+            "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent"
 
         /** Caps the text sent to Gemini to avoid excessively large requests. */
         const val MAX_INPUT_CHARS = 10_000

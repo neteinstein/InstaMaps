@@ -4,7 +4,7 @@ import org.neteinstein.instamaps.feature.maps.domain.MapsDestination
 
 /**
  * Boundary between the location-resolution domain layer and whatever AI service interprets raw
- * text into a place (Gemini 1.5 Flash in production; fakeable in tests).
+ * text into a place (Gemini Flash in production; fakeable in tests).
  */
 interface LocationRepository {
     /**
