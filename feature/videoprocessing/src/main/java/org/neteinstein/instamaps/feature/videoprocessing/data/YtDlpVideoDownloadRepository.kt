@@ -42,11 +42,7 @@ class YtDlpVideoDownloadRepository(
     private var initialized = false
 
     override suspend fun download(url: String): Result<DownloadedVideo> =
-<<<<<<< HEAD
         safeCall(mapError = { throwable -> ytDlpErrorToAppError(url, throwable) }) {
-=======
-        safeCall(mapError = { AppError.Network(it.describeOrDefault("Video download failed"), it) }) {
->>>>>>> origin/main
             withContext(dispatcherProvider.io) {
                 ensureInitialized()
 
@@ -174,7 +170,7 @@ fun ytDlpErrorToAppError(
     return if (isInstagramUrl(url) && AUTH_ERROR_SIGNATURES.any { message.contains(it) }) {
         AppError.AuthenticationRequired("Instagram is asking to log in again", throwable)
     } else {
-        AppError.Network("Video download failed", throwable)
+        AppError.Network(throwable.describeOrDefault("Video download failed"), throwable)
     }
 }
 
