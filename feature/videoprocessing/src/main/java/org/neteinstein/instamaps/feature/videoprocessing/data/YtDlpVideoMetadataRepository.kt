@@ -6,6 +6,7 @@ import com.yausername.youtubedl_android.YoutubeDL
 import kotlinx.coroutines.withContext
 import org.neteinstein.instamaps.core.common.AppError
 import org.neteinstein.instamaps.core.common.DispatcherProvider
+import org.neteinstein.instamaps.core.common.describeOrDefault
 import org.neteinstein.instamaps.core.common.safeCall
 import org.neteinstein.instamaps.feature.videoprocessing.domain.VideoMetadataRepository
 
@@ -34,7 +35,7 @@ class YtDlpVideoMetadataRepository(
     private var initialized = false
 
     override suspend fun fetchDescription(url: String): Result<String> =
-        safeCall(mapError = { AppError.Network("Fetching video metadata failed", it) }) {
+        safeCall(mapError = { AppError.Network(it.describeOrDefault("Fetching video metadata failed"), it) }) {
             withContext(dispatcherProvider.io) {
                 ensureInitialized()
                 val info = YoutubeDL.getInfo(url)

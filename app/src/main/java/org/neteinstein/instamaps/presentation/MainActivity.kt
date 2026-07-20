@@ -30,7 +30,10 @@ import org.neteinstein.instamaps.feature.share.work.ShareDeepLink
  * 2. Instagram/TikTok share ([Intent.ACTION_SEND], `text/plain`): renders [ShareRoute] with the
  *    shared text - it owns the whole download/OCR/geocode pipeline and its animated UI, but only
  *    starts it once ready; otherwise the main screen with warnings shows instead (see
- *    [ShareRoute]'s doc).
+ *    [ShareRoute]'s doc). [sharedText] is hoisted to a Compose state so a second share arriving
+ *    via [onNewIntent] - the default `launchMode`/task-affinity combo routes a repeat
+ *    `ACTION_SEND` into this same activity instance rather than a fresh one - re-triggers the
+ *    pipeline instead of being silently dropped.
  * 3. Result-notification tap ([ShareDeepLink.ACTION_OPEN_MAPS_DESTINATION], fired once the
  *    background [org.neteinstein.instamaps.feature.share.work.ProcessSharedUrlWorker] finds a
  *    place): a pure trampoline - hand off to [MapsLauncher] and finish immediately, without ever
@@ -44,6 +47,7 @@ import org.neteinstein.instamaps.feature.share.work.ShareDeepLink
  */
 class MainActivity : ComponentActivity() {
     private val mapsLauncher: MapsLauncher by inject()
+    private var sharedText by mutableStateOf<String?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -54,7 +58,7 @@ class MainActivity : ComponentActivity() {
             return
         }
 
-        val sharedText = intent.extractSharedText()
+        sharedText = intent.extractSharedText()
 
         setContent {
             InstaMapsTheme {
@@ -82,6 +86,13 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+
+        if (tryHandleMapsDeepLink(intent)) {
+            finish()
+            return
+        }
+
+        sharedText = intent.extractSharedText()
     }
 
     private fun tryHandleMapsDeepLink(intent: Intent): Boolean {
