@@ -47,6 +47,7 @@ dependencies {
     implementation(project(":core:common"))
     implementation(project(":core:designsystem"))
     implementation(project(":core:settings"))
+    implementation(project(":core:permissions"))
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.koin.android)

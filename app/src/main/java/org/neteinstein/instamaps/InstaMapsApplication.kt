@@ -12,6 +12,7 @@ import org.neteinstein.instamaps.feature.geocoding.di.geocodingModule
 import org.neteinstein.instamaps.feature.history.di.historyUiModule
 import org.neteinstein.instamaps.feature.instagramauth.di.instagramAuthUiModule
 import org.neteinstein.instamaps.feature.maps.di.mapsModule
+import org.neteinstein.instamaps.feature.permissions.di.permissionsUiModule
 import org.neteinstein.instamaps.feature.settings.di.settingsUiModule
 import org.neteinstein.instamaps.feature.share.di.shareModule
 import org.neteinstein.instamaps.feature.videoprocessing.di.videoProcessingModule
@@ -43,6 +44,7 @@ class InstaMapsApplication : Application() {
                 settingsUiModule,
                 instagramAuthUiModule,
                 historyUiModule,
+                permissionsUiModule,
             )
         }
     }
