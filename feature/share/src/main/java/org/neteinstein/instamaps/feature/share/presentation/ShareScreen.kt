@@ -128,7 +128,6 @@ fun ShareRoute(
         onOpenSettings = onOpenSettings,
         onOpenHistory = onOpenHistory,
         onNeedsInstagramLogin = onNeedsInstagramLogin,
-        onDismissAuthRequired = viewModel::dismissAuthRequired,
         onRetry = viewModel::retry,
         modifier = modifier,
     )
@@ -145,10 +144,12 @@ fun ShareRoute(
  * choice - and the CTA tap that actually launches Maps - to the user, even when there's only one.
  *
  * [showInstagramConnectWarning]/[onOpenSettings]/[onOpenHistory] only affect the [ShareUiState.Idle]
- * branch - the main screen. [ShareUiState.AuthRequired] uses [onNeedsInstagramLogin] too, but
- * reactively - see [ShareRoute]'s doc for why that state exists independently of the Idle nudge.
- * [onRetry] resumes the same video that just failed - offered on [ShareUiState.NotFound] always,
- * and on [ShareUiState.Error] whenever it carries a `url`.
+ * branch - the main screen. [ShareUiState.AuthRequired]'s "Log in" button uses [onNeedsInstagramLogin]
+ * reactively - see [ShareRoute]'s doc for why that state exists independently of the Idle nudge -
+ * while its "Not now" button uses [onRetry] with the state's own `url` to retry the same video
+ * anonymously instead of forcing a login. [onRetry] otherwise resumes the same video that just
+ * failed - offered on [ShareUiState.NotFound] always, and on [ShareUiState.Error] whenever it
+ * carries a `url`.
  */
 @Composable
 fun ShareScreen(
@@ -159,7 +160,6 @@ fun ShareScreen(
     onNeedsInstagramLogin: () -> Unit,
     modifier: Modifier = Modifier,
     showInstagramConnectWarning: Boolean = false,
-    onDismissAuthRequired: () -> Unit = {},
     onRetry: (String) -> Unit = {},
 ) {
     Surface(modifier = modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
@@ -196,7 +196,7 @@ fun ShareScreen(
                     AuthRequiredContent(
                         message = state.message,
                         onLogin = onNeedsInstagramLogin,
-                        onDismiss = onDismissAuthRequired,
+                        onContinueWithoutLogin = { onRetry(state.url) },
                     )
                 is ShareUiState.Error ->
                     ResultMessageContent(
@@ -568,14 +568,18 @@ private fun ResultMessageContent(
  * Shown when [ShareUiState.AuthRequired] - yt-dlp reported Instagram is demanding a (re-)login for
  * the video that's still pending. [onLogin] hands off to `feature:instagramauth`'s WebView screen;
  * [ShareViewModel] auto-resumes this same video the moment that login succeeds, so there's no
- * separate manual "retry" action here. [onDismiss] is the escape hatch for a user who doesn't want
- * to log in right now - it just returns to the idle screen without discarding the saved session.
+ * separate manual "retry" action for that path. [onContinueWithoutLogin] is for a user who doesn't
+ * want to log in right now: the stale session was already cleared by the time this state was
+ * reached (see `ProcessSharedUrlWorker.toFailureWorkData`), so it retries the exact same video
+ * anonymously rather than just returning to the idle screen - which succeeds whenever the failure
+ * wasn't actually a real login wall (e.g. Instagram's anonymous rate limiting reports wording that
+ * `ytDlpErrorToAppError` maps to this same state).
  */
 @Composable
 private fun AuthRequiredContent(
     message: String,
     onLogin: () -> Unit,
-    onDismiss: () -> Unit,
+    onContinueWithoutLogin: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     CenteredContent(modifier) {
@@ -596,7 +600,7 @@ private fun AuthRequiredContent(
 
         Spacer(modifier = Modifier.height(32.dp))
         PrimaryButton(text = stringResource(R.string.share_auth_required_login), onClick = onLogin)
-        TextButton(onClick = onDismiss) {
+        TextButton(onClick = onContinueWithoutLogin) {
             Text(text = stringResource(R.string.share_auth_required_dismiss))
         }
     }

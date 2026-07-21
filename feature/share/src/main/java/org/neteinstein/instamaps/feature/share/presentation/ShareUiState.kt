@@ -23,9 +23,12 @@ sealed class ShareUiState {
      * yt-dlp reported that Instagram is demanding a (re-)login for [url] - see
      * `YtDlpVideoDownloadRepository`'s `ytDlpErrorToAppError`. [ShareViewModel] already cleared
      * the stale session by the time this is emitted, and automatically retries [url] once
-     * [ShareViewModel.isInstagramAuthenticated] next reports `true`, so the UI only needs to get
-     * the user to [org.neteinstein.instamaps.feature.share.presentation.ShareRoute]'s
-     * `onNeedsInstagramLogin` callback - no manual "retry" action required.
+     * [ShareViewModel.isInstagramAuthenticated] next reports `true` - that's the "Log in" path via
+     * [org.neteinstein.instamaps.feature.share.presentation.ShareRoute]'s `onNeedsInstagramLogin`
+     * callback. The "Not now" path instead calls [ShareViewModel.retry] directly with [url]: since
+     * the stale session is already gone, that retries the download anonymously, succeeding
+     * whenever the failure wasn't actually a real login wall (e.g. Instagram's anonymous rate
+     * limiting reports wording that maps to this same state).
      */
     data class AuthRequired(val message: String, val url: String) : ShareUiState()
 
