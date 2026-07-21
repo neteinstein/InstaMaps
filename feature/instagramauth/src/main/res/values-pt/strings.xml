@@ -3,4 +3,6 @@
     <string name="instagram_login_title">Conectar Instagram</string>
     <string name="instagram_login_back">Voltar</string>
     <string name="instagram_login_explanation">Faça login no Instagram para que o InstaMaps consiga baixar vídeos com mais confiabilidade. O InstaMaps armazena apenas sua sessão, nunca sua senha.</string>
+    <string name="instagram_login_cookie_hint">Se um aviso de cookies estiver a bloquear a página abaixo, toque em Aceitar cookies para o dispensar e continuar.</string>
+    <string name="instagram_login_accept_cookies">Aceitar cookies</string>
 </resources>

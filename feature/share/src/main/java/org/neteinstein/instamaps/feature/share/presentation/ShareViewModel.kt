@@ -74,13 +74,6 @@ class ShareViewModel(
         enqueueProcessing(parsed.url)
     }
 
-    /** Dismisses [ShareUiState.AuthRequired] without logging in, returning to the main screen. */
-    fun dismissAuthRequired() {
-        if (_uiState.value is ShareUiState.AuthRequired) {
-            _uiState.value = ShareUiState.Idle
-        }
-    }
-
     private fun retryIfAuthRequiredPending() {
         val pending = _uiState.value
         if (pending is ShareUiState.AuthRequired) {
@@ -89,7 +82,13 @@ class ShareViewModel(
     }
 
     /** Re-runs the pipeline for [url] - the manual counterpart to [retryIfAuthRequiredPending],
-     * wired to the Retry button [ShareScreen] shows on [ShareUiState.NotFound]/[ShareUiState.Error]. */
+     * wired to the Retry button [ShareScreen] shows on [ShareUiState.NotFound]/[ShareUiState.Error],
+     * and to the "Not now" button on [ShareUiState.AuthRequired]. In that last case the stale
+     * session was already cleared by the time [ShareUiState.AuthRequired] was emitted (see
+     * `ProcessSharedUrlWorker.toFailureWorkData`), so this simply re-runs the download anonymously
+     * instead of reusing the rejected cookie - which succeeds whenever the failure wasn't actually
+     * a real login wall (e.g. Instagram's anonymous rate limiting reports wording that
+     * `ytDlpErrorToAppError` maps to the same [org.neteinstein.instamaps.core.common.AppError.AuthenticationRequired]). */
     fun retry(url: String) {
         enqueueProcessing(url)
     }

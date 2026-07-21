@@ -32,7 +32,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.koin.androidx.compose.koinViewModel
+import org.neteinstein.instamaps.core.designsystem.component.BannerTone
 import org.neteinstein.instamaps.core.designsystem.component.LoadingIndicator
+import org.neteinstein.instamaps.core.designsystem.component.WarningBanner
 import org.neteinstein.instamaps.feature.instagramauth.R
 
 private const val INSTAGRAM_LOGIN_URL = "https://www.instagram.com/accounts/login/"
@@ -62,14 +64,24 @@ private const val MOBILE_LOGIN_USER_AGENT =
 // modal sitting on top of (and intercepting every touch for) the real login form underneath, even
 // once the form itself is visible. Auto-accepting it here is equivalent to the user tapping the
 // (invisible) "Allow all cookies" button themselves, and immediately unblocks the real form.
+//
+// The button's text follows the page's own language (the device/WebView locale, via the
+// `Accept-Language` header WebView sends by default) - a device set to Portuguese, for example,
+// never matches an English-only check, leaving the invisible modal blocking the form indefinitely
+// (reported on a Nothing Phone running Android 16). `acceptedTexts` below lists every wording
+// confirmed so far - one entry per locale this app ships (`values`/`values-pt`) - matched
+// case-insensitively so minor casing differences don't matter. This can't cover every
+// device/locale/WebView combination, though, so [InstagramLoginScreen] also exposes a manual
+// "Accept cookies" action that re-runs this same script on demand - see its own kdoc.
 private const val AUTO_ACCEPT_COOKIES_SCRIPT =
     """
     (function() {
         function tryAccept() {
+            var acceptedTexts = ['allow all cookies', 'permitir todos os cookies', 'aceitar todos os cookies'];
             var candidates = document.querySelectorAll('button, [role="button"]');
             for (var i = 0; i < candidates.length; i++) {
-                var text = (candidates[i].innerText || candidates[i].textContent || '').trim();
-                if (text === 'Allow all cookies') {
+                var text = (candidates[i].innerText || candidates[i].textContent || '').trim().toLowerCase();
+                if (acceptedTexts.indexOf(text) !== -1) {
                     candidates[i].click();
                     return true;
                 }
@@ -118,6 +130,15 @@ fun InstagramLoginRoute(
  * from [WebViewClient.onPageFinished], the first time the cookie jar for the current URL contains
  * the `sessionid` cookie (the only one of Instagram's cookies that's set exclusively *after* a
  * successful login - `csrftoken`/`mid`/`ig_did` are all present pre-login too).
+ *
+ * Also always shows a small [WarningBanner] ([BannerTone.INFO] - this is a workaround for a
+ * WebView rendering quirk, not an app error) with an "Accept cookies" action that re-runs
+ * [AUTO_ACCEPT_COOKIES_SCRIPT] on demand. [AUTO_ACCEPT_COOKIES_SCRIPT] already runs automatically
+ * on every page load, but it can only click a button whose text it recognizes, and there's no
+ * reliable way to detect *from this side* whether Instagram's invisible cookie-consent modal is
+ * still silently blocking the (visible) form underneath - the safer, lower-complexity choice is
+ * to always offer this manual escape hatch rather than keep expanding the automatic text list for
+ * every new device/locale/WebView combination that turns up.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @SuppressLint("SetJavaScriptEnabled")
@@ -160,6 +181,13 @@ fun InstagramLoginScreen(
                 text = stringResource(R.string.instagram_login_explanation),
                 style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier.fillMaxWidth().padding(16.dp),
+            )
+            WarningBanner(
+                message = stringResource(R.string.instagram_login_cookie_hint),
+                tone = BannerTone.INFO,
+                actionLabel = stringResource(R.string.instagram_login_accept_cookies),
+                onActionClick = { webViewHolder.webView?.evaluateJavascript(AUTO_ACCEPT_COOKIES_SCRIPT, null) },
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
             )
             Box(modifier = Modifier.fillMaxSize()) {
                 AndroidView(
