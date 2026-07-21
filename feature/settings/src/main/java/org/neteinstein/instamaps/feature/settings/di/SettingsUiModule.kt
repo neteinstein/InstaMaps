@@ -14,6 +14,9 @@ val settingsUiModule =
             SettingsViewModel(
                 observeGeminiApiKeyUseCase = get(),
                 saveGeminiApiKeyUseCase = get(),
+                checkForUpdateUseCase = get(),
+                downloadAppUpdateUseCase = get(),
+                appUpdateInstaller = get(),
             )
         }
     }

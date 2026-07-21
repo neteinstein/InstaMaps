@@ -15,4 +15,12 @@
     <string name="settings_permission_status_blocked">Blocked</string>
     <string name="settings_permission_grant_cta">Grant</string>
     <string name="settings_permission_open_app_settings_cta">Open App Settings</string>
+
+    <string name="settings_update_section_title">Updates</string>
+    <string name="settings_update_button">Update to latest</string>
+    <string name="settings_update_checking">Checking for updates…</string>
+    <string name="settings_update_up_to_date">You\'re on the latest version (%1$s).</string>
+    <string name="settings_update_downloading">Downloading update…</string>
+    <string name="settings_update_sideloading_warning">To install this update, allow InstaMaps to install unknown apps.</string>
+    <string name="settings_update_enable_sideloading_cta">Enable</string>
 </resources>

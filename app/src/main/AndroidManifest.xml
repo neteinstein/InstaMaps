@@ -6,6 +6,11 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <!-- Gates AppUpdateInstaller.canInstallPackages()/installPackage() (the Settings screen's
+         "Update to latest" button) - granting this is a special, per-app "install unknown apps"
+         toggle the user must flip in system Settings; the permission's mere presence here does
+         not enable sideloading by itself, it only lets the app ask the OS whether it's allowed. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <!-- Android 11+ package-visibility: required for MapsLauncher's explicit-package
          resolveActivity() check against the native Google Maps app. Its implicit-browser
@@ -62,6 +67,22 @@
             android:name="androidx.work.impl.foreground.SystemForegroundService"
             android:foregroundServiceType="dataSync"
             tools:node="merge" />
+
+        <!-- Lets AppUpdateInstaller hand a downloaded update APK (cached under
+             context.cacheDir/updates/ by GitHubUpdateRepository) to the system Package Installer
+             as a content:// Uri - a plain file:// Uri would throw FileUriExposedException under
+             this app's targetSdk. The authority here must match AppUpdateInstaller's
+             FILE_PROVIDER_AUTHORITY_SUFFIX exactly, and update_file_paths.xml's cache-path must
+             match GitHubUpdateRepository's download directory exactly. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.update.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/update_file_paths" />
+        </provider>
 
     </application>
 </manifest>

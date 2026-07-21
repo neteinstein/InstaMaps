@@ -159,6 +159,20 @@ history icon next to Settings (top right of the main screen) to see the last 50:
 reopen the original video, or, if a place was found for it, tap **Open in Google Maps** to jump
 straight to the top match.
 
+### Updating InstaMaps
+
+Settings has an **Update to latest** button that checks
+[GitHub Releases](https://github.com/neteinstein/InstaMaps/releases) for a build newer than the
+one you have installed. If one exists, InstaMaps downloads its APK and hands it straight to the
+system installer - no need to uninstall first, manually grab the APK from GitHub, or use `adb
+install`. If you're already on the latest release, it just tells you so.
+
+Installing an APK from outside the Play Store requires Android's one-time "install unknown apps"
+permission for InstaMaps specifically. If it isn't granted yet, pressing **Update to latest** shows
+a warning instead of downloading anything, with a button that jumps straight to that permission's
+page in system Settings - grant it there, come back, and press **Update to latest** again to
+continue.
+
 ## Architecture
 
 Kotlin, Jetpack Compose, MVVM, Coroutines, Koin DI, one Gradle module per feature, Clean
