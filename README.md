@@ -57,13 +57,15 @@ file is required, the project compiles on a clean checkout with no extra configu
 ./gradlew installDebug   # with a device/emulator connected
 ```
 
-InstaMaps needs a Gemini API key to identify locations. See
-[Getting a Gemini API key](#getting-a-gemini-api-key) below, then open the app, tap the settings
-icon (top right of the main screen), paste the key into the Gemini API Key field, and tap Save.
-The key is stored on-device with Jetpack DataStore and included in Android's automatic app backup,
-so it carries over to your other devices/a reinstall without re-entering it. Until a key is saved,
-the main screen shows a warning with a shortcut straight to Settings instead of attempting to
-resolve the location.
+InstaMaps needs a Gemini API key to identify locations, plus a couple of runtime permissions.
+The first time you open the app (and again any time one of these is later revoked), it shows an
+onboarding screen explaining what InstaMaps does and why each item is needed, with a button right
+next to each explanation to resolve it. See [Getting a Gemini API key](#getting-a-gemini-api-key)
+below for the key itself - tap its card's button to jump to Settings, paste the key into the
+Gemini API Key field, and tap Save. The key is stored on-device with Jetpack DataStore and
+included in Android's automatic app backup, so it carries over to your other devices/a reinstall
+without re-entering it. The app switches over to its normal main screen automatically the moment
+every requirement is resolved.
 
 ## Getting a Gemini API key
 
@@ -75,8 +77,9 @@ free API key:
 3. Pick an existing Google Cloud project or let Google AI Studio create one for you - the free
    tier is enough for personal use of InstaMaps.
 4. Copy the generated key (starts with `AIza...`).
-5. In InstaMaps, tap the settings icon (top right of the main screen), paste the key into the
-   Gemini API Key field, and tap Save.
+5. In InstaMaps, open Settings - reachable from the top right of the main screen, or straight from
+   the onboarding screen if you haven't added a key yet - paste the key into the Gemini API Key
+   field, and tap Save.
 
 Keep the key private - anyone with it can make Gemini API calls billed to your project. InstaMaps
 stores it on-device only (Jetpack DataStore) and never sends it anywhere except directly to
@@ -111,13 +114,14 @@ details, current rate limits per tier, and pricing.
 
 Logging into Instagram is optional - InstaMaps downloads plenty of public content without it -
 but improves reliability, since Instagram rate-limits and occasionally blocks anonymous
-(logged-out) requests. If no session is saved, the main screen shows a dismissible "Connect Instagram"
-banner; tapping it opens a screen with a real `WebView` pointed at Instagram's own login page.
-InstaMaps never sees the password you type - it only detects the session cookie Instagram sets
-once login succeeds, encrypts it on-device (AndroidKeystore-backed AES-256-GCM), and stores it
-separately from your Gemini API key, deliberately left out of Android's backup/device-transfer
-so a restored copy on another device (where the encryption key wouldn't exist) can't leave a
-broken, undecryptable session behind.
+(logged-out) requests. Because it's optional, it's the one setup nudge that stays on the main
+screen rather than the onboarding screen below, shown as a dismissible, deliberately non-red
+"Connect Instagram" banner (it's a suggestion, not a warning); tapping it opens a screen with a
+real `WebView` pointed at Instagram's own login page. InstaMaps never sees the password you type -
+it only detects the session cookie Instagram sets once login succeeds, encrypts it on-device
+(AndroidKeystore-backed AES-256-GCM), and stores it separately from your Gemini API key,
+deliberately left out of Android's backup/device-transfer so a restored copy on another device
+(where the encryption key wouldn't exist) can't leave a broken, undecryptable session behind.
 
 If a specific shared video still needs a login (e.g. an age-gated or otherwise restricted post),
 the main screen automatically shows a "Log in to Instagram" prompt instead of a generic error, and
@@ -139,12 +143,14 @@ If something fails partway through - a download error, no location found in the 
 hiccup - the screen explains what went wrong with a **Retry** button that re-runs the exact same
 video, instead of having to re-share it from Instagram/TikTok.
 
-If the Gemini API key or a required runtime permission is missing, InstaMaps opens to the main
-screen instead of processing the video, showing a warning per missing item with a button to fix
-it (jump to Settings, grant the permission, or open the system app-settings page if it was
-previously denied). Once everything's in place, sharing the same video again - or just waiting,
-since the app also resumes automatically once you fix the last warning if you got there without
-sharing - continues into the normal pipeline.
+If the Gemini API key or a required runtime permission is missing, InstaMaps opens to an
+onboarding screen instead of the main screen: a short animation of videos flowing in and a map
+coming out explains what the app does, then each requirement gets its own card explaining why
+it's needed with a button right there to resolve it (jump to Settings, grant the permission, or
+open the system app-settings page if it was previously denied). The moment every requirement is
+resolved the app switches over to the normal main screen on its own - no separate "continue" step,
+and no need to re-share the video if you got there without one. Revoking a permission later (from
+system Settings) brings this same screen back the next time you open InstaMaps.
 
 ### History
 

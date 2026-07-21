@@ -112,6 +112,7 @@ dependencies {
     implementation(project(":feature:settings"))
     implementation(project(":feature:instagramauth"))
     implementation(project(":feature:history"))
+    implementation(project(":feature:permissions"))
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)

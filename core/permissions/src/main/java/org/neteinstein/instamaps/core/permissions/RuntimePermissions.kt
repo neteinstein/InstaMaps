@@ -1,4 +1,4 @@
-package org.neteinstein.instamaps.feature.share.presentation
+package org.neteinstein.instamaps.core.permissions
 
 import android.Manifest
 import android.app.Activity
@@ -28,6 +28,10 @@ import androidx.lifecycle.compose.LifecycleEventEffect
  * `POST_NOTIFICATIONS` on API 33+ (required to show the result notification - see
  * `ShareNotifier.hasNotificationPermission`); extend this list, not scattered SDK_INT checks
  * elsewhere, as more permissions are needed.
+ *
+ * Lives in `core:permissions` (not a feature module) so both `feature:permissions`'s onboarding
+ * gate and `feature:settings`'s status display can depend on it without depending on each other -
+ * feature modules never depend on each other directly, see `agents.md`.
  */
 fun requiredRuntimePermissions(): List<String> =
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {

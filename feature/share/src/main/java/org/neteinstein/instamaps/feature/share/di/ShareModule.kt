@@ -27,7 +27,6 @@ val shareModule =
             ShareViewModel(
                 context = androidContext(),
                 parseSharedTextUseCase = get(),
-                isGeminiApiKeyConfiguredUseCase = get(),
                 observeInstagramAuthStateUseCase = get(),
             )
         }

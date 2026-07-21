@@ -16,6 +16,8 @@ import org.neteinstein.instamaps.feature.history.presentation.HistoryRoute
 import org.neteinstein.instamaps.feature.instagramauth.presentation.InstagramLoginRoute
 import org.neteinstein.instamaps.feature.maps.MapsLauncher
 import org.neteinstein.instamaps.feature.maps.domain.MapsDestination
+import org.neteinstein.instamaps.feature.permissions.presentation.PermissionsScreen
+import org.neteinstein.instamaps.feature.permissions.presentation.rememberAppReadiness
 import org.neteinstein.instamaps.feature.settings.presentation.SettingsRoute
 import org.neteinstein.instamaps.feature.share.presentation.ShareRoute
 import org.neteinstein.instamaps.feature.share.work.ShareDeepLink
@@ -24,28 +26,37 @@ import org.neteinstein.instamaps.feature.share.work.ShareDeepLink
  * Single-Activity host for all three ways InstaMaps can be entered - see the three
  * `<intent-filter>` blocks on this activity in the manifest:
  *
- * 1. Plain launcher tap: no shared text, renders [ShareRoute] with a `null` `sharedText` - which
- *    is also what renders the main-screen readiness warnings (missing API key/permissions, no
- *    Instagram session) since they're computed inside [ShareRoute] regardless of how the screen
- *    was reached.
+ * 1. Plain launcher tap: no shared text, renders [ShareRoute] with a `null` `sharedText` once
+ *    ready (see below) - otherwise [PermissionsScreen] shows instead.
  * 2. Instagram/TikTok share ([Intent.ACTION_SEND], `text/plain`): renders [ShareRoute] with the
- *    shared text - it owns the whole download/OCR/geocode pipeline and its animated UI, but only
- *    starts it once ready; otherwise the main screen with warnings shows instead (see
- *    [ShareRoute]'s doc). [sharedText] is hoisted to a Compose state so a second share arriving
- *    via [onNewIntent] - the default `launchMode`/task-affinity combo routes a repeat
- *    `ACTION_SEND` into this same activity instance rather than a fresh one - re-triggers the
- *    pipeline instead of being silently dropped.
+ *    shared text once ready - it owns the whole download/OCR/geocode pipeline and its animated
+ *    UI. [sharedText] is hoisted to a Compose state so a second share arriving via [onNewIntent] -
+ *    the default `launchMode`/task-affinity combo routes a repeat `ACTION_SEND` into this same
+ *    activity instance rather than a fresh one - re-triggers the pipeline instead of being
+ *    silently dropped.
  * 3. Result-notification tap ([ShareDeepLink.ACTION_OPEN_MAPS_DESTINATION], fired once the
  *    background [org.neteinstein.instamaps.feature.share.work.ProcessSharedUrlWorker] finds a
  *    place): a pure trampoline - hand off to [MapsLauncher] and finish immediately, without ever
  *    drawing this app's own UI, since the pipeline already completed in the background.
+ *
+ * The [Screen.SHARE] branch is gated on [rememberAppReadiness]: a missing Gemini API key or a
+ * missing runtime permission (currently just notifications - see
+ * `org.neteinstein.instamaps.core.permissions.requiredRuntimePermissions`) renders [PermissionsScreen]
+ * - which explains what InstaMaps does and why each requirement is needed - instead of
+ * [ShareRoute]. Readiness is recomputed on every recomposition (including on resume), so this
+ * isn't just a first-run check: revoking a permission from system Settings and reopening
+ * InstaMaps, or coming back from the system App Settings page, lands back on [PermissionsScreen]
+ * again automatically, and the moment everything's resolved the same recomposition flips over to
+ * [ShareRoute] without any explicit "continue" step.
  *
  * Also owns the Share/Settings/History/Instagram-login switch: there's no Navigation-Compose in
  * this app, so opening Settings or History (the top-right buttons on the main screen) or the
  * Instagram login screen
  * (from a warning banner or [org.neteinstein.instamaps.feature.share.presentation.ShareUiState.AuthRequired])
  * is just a local [Screen] flag flipped back by that screen's own back arrow, a successful login,
- * or the system back gesture/button.
+ * or the system back gesture/button. Settings/History/Instagram-login stay reachable regardless of
+ * readiness - [PermissionsScreen]'s "Add API key" CTA needs to reach Settings even before the app
+ * is ready.
  */
 class MainActivity : ComponentActivity() {
     private val mapsLauncher: MapsLauncher by inject()
@@ -75,13 +86,22 @@ class MainActivity : ComponentActivity() {
                             onBack = { screen = Screen.SHARE },
                             onLoginSuccess = { screen = Screen.SHARE },
                         )
-                    Screen.SHARE ->
-                        ShareRoute(
-                            sharedText = sharedText,
-                            onOpenSettings = { screen = Screen.SETTINGS },
-                            onOpenHistory = { screen = Screen.HISTORY },
-                            onNeedsInstagramLogin = { screen = Screen.INSTAGRAM_LOGIN },
-                        )
+                    Screen.SHARE -> {
+                        val readiness = rememberAppReadiness()
+                        if (readiness.isReady) {
+                            ShareRoute(
+                                sharedText = sharedText,
+                                onOpenSettings = { screen = Screen.SETTINGS },
+                                onOpenHistory = { screen = Screen.HISTORY },
+                                onNeedsInstagramLogin = { screen = Screen.INSTAGRAM_LOGIN },
+                            )
+                        } else {
+                            PermissionsScreen(
+                                readiness = readiness,
+                                onOpenSettings = { screen = Screen.SETTINGS },
+                            )
+                        }
+                    }
                 }
             }
         }

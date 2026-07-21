@@ -1,6 +1,5 @@
 package org.neteinstein.instamaps.feature.share.presentation
 
-import android.Manifest
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -73,6 +72,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.delay
 import org.koin.androidx.compose.koinViewModel
 import org.koin.compose.koinInject
+import org.neteinstein.instamaps.core.designsystem.component.BannerTone
 import org.neteinstein.instamaps.core.designsystem.component.PrimaryButton
 import org.neteinstein.instamaps.core.designsystem.component.WarningBanner
 import org.neteinstein.instamaps.core.designsystem.theme.MapsGreen
@@ -82,20 +82,18 @@ import org.neteinstein.instamaps.feature.maps.domain.MapsDestination
 import org.neteinstein.instamaps.feature.share.R
 
 /**
- * Stateful entry point: parses the incoming share text once ready, then renders [ShareScreen]
- * driven by [ShareViewModel]'s [ShareUiState]. [sharedText] is `null` for a plain launcher open;
- * either way, this always renders (never bypasses) so main-screen readiness warnings - missing
- * API key, missing permissions, no Instagram session - are computed and shown in one place
- * regardless of how the screen was reached. Processing only starts once [isReady]: a video shared
- * while something is missing leaves the main screen showing those warnings instead of starting
- * the pipeline, and automatically proceeds the moment the user resolves them (grants the
- * permission, saves a key).
+ * Stateful entry point: parses the incoming share text once composed, then renders [ShareScreen]
+ * driven by [ShareViewModel]'s [ShareUiState]. [sharedText] is `null` for a plain launcher open.
+ * Unlike earlier revisions, this composable no longer gates on API-key/permission readiness
+ * itself - `MainActivity` only composes [ShareRoute] once `rememberAppReadiness().isReady` is
+ * true (see `feature:permissions`'s `PermissionsScreen`, which is what's shown instead while
+ * something's missing), so by the time this runs it can always start processing immediately.
  *
- * Instagram login is deliberately *not* part of [isReady]: unlike the API key/permissions, it's
- * an optional reliability boost (see `YtDlpVideoDownloadRepository`), not a hard requirement -
- * plenty of public Instagram content downloads fine while logged out. So a missing session only
- * shows as a dismissible nudge on the idle screen, and only actually interrupts a share reactively,
- * if yt-dlp itself reports the specific video needs a login (see [ShareUiState.AuthRequired]).
+ * Instagram login is a separate, deliberately optional concern - unlike the API key/permissions,
+ * it's a reliability boost (see `YtDlpVideoDownloadRepository`), not a hard requirement, so it's
+ * never part of the app-wide readiness gate. A missing session only shows as a dismissible nudge
+ * on this idle screen, and only actually interrupts a share reactively, if yt-dlp itself reports
+ * the specific video needs a login (see [ShareUiState.AuthRequired]).
  */
 @Composable
 fun ShareRoute(
@@ -107,14 +105,10 @@ fun ShareRoute(
     viewModel: ShareViewModel = koinViewModel(),
     mapsLauncher: MapsLauncher = koinInject(),
 ) {
-    val hasGeminiApiKey by viewModel.hasGeminiApiKey.collectAsStateWithLifecycle()
     val isInstagramAuthenticated by viewModel.isInstagramAuthenticated.collectAsStateWithLifecycle()
-    val permissionStates = requiredRuntimePermissions().map { rememberRuntimePermissionState(it) }
-    val missingPermissions = permissionStates.filter { it.status != RuntimePermissionStatus.GRANTED }
-    val isReady = hasGeminiApiKey == true && missingPermissions.isEmpty()
 
-    LaunchedEffect(sharedText, isReady) {
-        if (sharedText != null && isReady) {
+    LaunchedEffect(sharedText) {
+        if (sharedText != null) {
             viewModel.onSharedTextReceived(sharedText)
         }
     }
@@ -123,8 +117,6 @@ fun ShareRoute(
     ShareScreen(
         uiState = uiState,
         onOpenMaps = { mapsLauncher.launch(it) },
-        showApiKeyWarning = hasGeminiApiKey == false,
-        missingPermissions = missingPermissions,
         showInstagramConnectWarning = isInstagramAuthenticated == false,
         onOpenSettings = onOpenSettings,
         onOpenHistory = onOpenHistory,
@@ -145,13 +137,11 @@ fun ShareRoute(
  * place (see [ResolvedLocation]), so [FoundContent] always lists every one of them and leaves the
  * choice - and the CTA tap that actually launches Maps - to the user, even when there's only one.
  *
- * [showApiKeyWarning]/[missingPermissions]/[showInstagramConnectWarning]/[onOpenSettings]/
- * [onOpenHistory] only affect the [ShareUiState.Idle] branch - the main screen - since that's the
- * only state a user can be looking at while something's missing (processing/found/etc. only
- * happen once [ShareRoute] has already gated on readiness). [ShareUiState.AuthRequired] uses
- * [onNeedsInstagramLogin] too, but reactively - see [ShareRoute]'s doc for why that state exists
- * independently of the Idle warning. [onRetry] resumes the same video that just failed - offered
- * on [ShareUiState.NotFound] always, and on [ShareUiState.Error] whenever it carries a `url`.
+ * [showInstagramConnectWarning]/[onOpenSettings]/[onOpenHistory] only affect the [ShareUiState.Idle]
+ * branch - the main screen. [ShareUiState.AuthRequired] uses [onNeedsInstagramLogin] too, but
+ * reactively - see [ShareRoute]'s doc for why that state exists independently of the Idle nudge.
+ * [onRetry] resumes the same video that just failed - offered on [ShareUiState.NotFound] always,
+ * and on [ShareUiState.Error] whenever it carries a `url`.
  */
 @Composable
 fun ShareScreen(
@@ -161,8 +151,6 @@ fun ShareScreen(
     onOpenHistory: () -> Unit,
     onNeedsInstagramLogin: () -> Unit,
     modifier: Modifier = Modifier,
-    showApiKeyWarning: Boolean = false,
-    missingPermissions: List<RuntimePermissionState> = emptyList(),
     showInstagramConnectWarning: Boolean = false,
     onDismissAuthRequired: () -> Unit = {},
     onRetry: (String) -> Unit = {},
@@ -182,8 +170,6 @@ fun ShareScreen(
             when (state) {
                 is ShareUiState.Idle ->
                     IdleContent(
-                        showApiKeyWarning = showApiKeyWarning,
-                        missingPermissions = missingPermissions,
                         showInstagramConnectWarning = showInstagramConnectWarning,
                         onOpenSettings = onOpenSettings,
                         onOpenHistory = onOpenHistory,
@@ -220,8 +206,6 @@ fun ShareScreen(
 
 @Composable
 private fun IdleContent(
-    showApiKeyWarning: Boolean,
-    missingPermissions: List<RuntimePermissionState>,
     showInstagramConnectWarning: Boolean,
     onOpenSettings: () -> Unit,
     onOpenHistory: () -> Unit,
@@ -261,34 +245,14 @@ private fun IdleContent(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
-            if (showApiKeyWarning || missingPermissions.isNotEmpty() || showInstagramConnectWarning) {
+            if (showInstagramConnectWarning) {
                 Spacer(modifier = Modifier.height(24.dp))
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    if (showApiKeyWarning) {
-                        WarningBanner(
-                            message = stringResource(R.string.share_warning_missing_api_key),
-                            actionLabel = stringResource(R.string.share_warning_open_settings),
-                            onActionClick = onOpenSettings,
-                        )
-                    }
-                    missingPermissions.forEach { permissionState ->
-                        WarningBanner(
-                            message = permissionWarningMessage(permissionState.permission),
-                            actionLabel = permissionActionLabel(permissionState.status),
-                            onActionClick = permissionState.requestOrOpenSettings,
-                        )
-                    }
-                    if (showInstagramConnectWarning) {
-                        WarningBanner(
-                            message = stringResource(R.string.share_warning_instagram_not_connected),
-                            actionLabel = stringResource(R.string.share_warning_connect_instagram),
-                            onActionClick = onConnectInstagram,
-                        )
-                    }
-                }
+                WarningBanner(
+                    message = stringResource(R.string.share_warning_instagram_not_connected),
+                    actionLabel = stringResource(R.string.share_warning_connect_instagram),
+                    onActionClick = onConnectInstagram,
+                    tone = BannerTone.INFO,
+                )
             }
         }
 
@@ -313,21 +277,6 @@ private fun IdleContent(
         }
     }
 }
-
-@Composable
-private fun permissionWarningMessage(permission: String): String =
-    when (permission) {
-        Manifest.permission.POST_NOTIFICATIONS -> stringResource(R.string.share_warning_missing_notifications_permission)
-        else -> stringResource(R.string.share_warning_missing_permission_generic)
-    }
-
-@Composable
-private fun permissionActionLabel(status: RuntimePermissionStatus): String =
-    if (status == RuntimePermissionStatus.PERMANENTLY_DENIED) {
-        stringResource(R.string.share_warning_open_app_settings)
-    } else {
-        stringResource(R.string.share_warning_grant_permission)
-    }
 
 @Composable
 private fun ProcessingContent(

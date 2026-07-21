@@ -18,7 +18,6 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import org.neteinstein.instamaps.core.instagramauth.domain.ObserveInstagramAuthStateUseCase
-import org.neteinstein.instamaps.core.settings.domain.IsGeminiApiKeyConfiguredUseCase
 import org.neteinstein.instamaps.feature.share.domain.ParseSharedTextUseCase
 import org.neteinstein.instamaps.feature.share.work.ProcessSharedUrlWorker
 import org.neteinstein.instamaps.feature.share.work.toResolvedLocations
@@ -29,30 +28,22 @@ import org.neteinstein.instamaps.feature.share.work.toResolvedLocations
  * its request id via [WorkManager.getWorkInfoByIdFlow]. This split means the pipeline keeps
  * running (and the completion notification still fires) even if the process backgrounding the
  * user just did to share a video kills this ViewModel entirely.
+ *
+ * Readiness (Gemini API key + runtime permissions) is no longer this ViewModel's concern - see
+ * `org.neteinstein.instamaps.feature.permissions.presentation.rememberAppReadiness` -
+ * `MainActivity` only renders [ShareRoute] once that's already satisfied.
  */
 class ShareViewModel(
     private val context: Context,
     private val parseSharedTextUseCase: ParseSharedTextUseCase,
-    private val isGeminiApiKeyConfiguredUseCase: IsGeminiApiKeyConfiguredUseCase,
     private val observeInstagramAuthStateUseCase: ObserveInstagramAuthStateUseCase,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow<ShareUiState>(ShareUiState.Idle)
     val uiState: StateFlow<ShareUiState> = _uiState.asStateFlow()
 
     /**
-     * `null` while the first read from Settings is still in flight - kept distinct from `false`
-     * so the main screen doesn't flash a "missing key" warning before the real value loads, and
-     * so a shared video isn't allowed to start processing on that same false premise. Collected
-     * eagerly (not just while the UI observes it) so the value is already current by the time the
-     * user comes back from the Settings screen.
-     */
-    val hasGeminiApiKey: StateFlow<Boolean?> =
-        isGeminiApiKeyConfiguredUseCase()
-            .map { hasKey -> hasKey as Boolean? }
-            .stateIn(viewModelScope, SharingStarted.Eagerly, initialValue = null)
-
-    /**
-     * `null`/`false` distinction mirrors [hasGeminiApiKey]. Collected eagerly so
+     * `null` while the first read from `core:instagramauth` is still in flight, kept distinct
+     * from `false` for the same reason as `AppReadiness.hasGeminiApiKey`. Collected eagerly so
      * [retryIfAuthRequiredPending] fires the moment the user logs back in via
      * `feature:instagramauth`, even though [ShareRoute] isn't composed (and therefore isn't
      * observing anything) while that login screen is on top.

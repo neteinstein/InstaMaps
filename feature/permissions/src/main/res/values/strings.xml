@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="permissions_headline">From shared video to map, automatically</string>
+    <string name="permissions_subtitle">InstaMaps downloads the video you share, reads its caption and on-screen text, asks Gemini where it was filmed, and opens that exact spot in Google Maps - all on your device.</string>
+    <string name="permissions_section_title">Before we start, InstaMaps needs:</string>
+
+    <string name="permissions_api_key_title">Gemini API key</string>
+    <string name="permissions_api_key_explanation">InstaMaps sends the video\'s caption and on-screen text to Google\'s Gemini model to figure out which real-world place it shows. A free key from Google AI Studio is required for that lookup to work.</string>
+    <string name="permissions_api_key_status_added">Added</string>
+    <string name="permissions_api_key_status_missing">Not added</string>
+    <string name="permissions_api_key_cta">Add API key</string>
+
+    <string name="permissions_notifications_title">Notifications</string>
+    <string name="permissions_notifications_explanation">Finding a location can take a moment, especially right after you share a video. InstaMaps notifies you the instant it\'s done so you don\'t have to keep the app open and wait.</string>
+    <string name="permissions_generic_title">Permission needed</string>
+    <string name="permissions_generic_explanation">This permission is required for InstaMaps to work properly.</string>
+
+    <string name="permissions_status_granted">Granted</string>
+    <string name="permissions_status_not_granted">Not granted</string>
+    <string name="permissions_status_blocked">Blocked</string>
+    <string name="permissions_grant_cta">Grant permission</string>
+    <string name="permissions_open_app_settings_cta">Open App Settings</string>
+</resources>

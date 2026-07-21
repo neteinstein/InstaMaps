@@ -7,7 +7,7 @@ plugins {
 }
 
 android {
-    namespace = "org.neteinstein.instamaps.feature.share"
+    namespace = "org.neteinstein.instamaps.feature.permissions"
     compileSdk = 36
 
     defaultConfig {
@@ -46,15 +46,10 @@ ktlint {
 dependencies {
     implementation(project(":core:common"))
     implementation(project(":core:designsystem"))
-    implementation(project(":core:instagramauth"))
-    implementation(project(":core:history"))
-    implementation(project(":feature:videoprocessing"))
-    implementation(project(":feature:geocoding"))
-    implementation(project(":feature:maps"))
+    implementation(project(":core:settings"))
+    implementation(project(":core:permissions"))
 
     implementation(libs.androidx.core.ktx)
-    implementation(libs.androidx.activity.compose)
-    implementation(libs.androidx.work.runtime.ktx)
     implementation(libs.koin.android)
     implementation(libs.koin.androidx.compose)
     implementation(libs.kotlinx.coroutines.android)
