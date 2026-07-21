@@ -16,12 +16,15 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -30,13 +33,17 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -47,15 +54,18 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringArrayResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -66,6 +76,7 @@ import org.koin.compose.koinInject
 import org.neteinstein.instamaps.core.designsystem.component.PrimaryButton
 import org.neteinstein.instamaps.core.designsystem.component.WarningBanner
 import org.neteinstein.instamaps.core.designsystem.theme.MapsGreen
+import org.neteinstein.instamaps.feature.geocoding.domain.ResolvedLocation
 import org.neteinstein.instamaps.feature.maps.MapsLauncher
 import org.neteinstein.instamaps.feature.maps.domain.MapsDestination
 import org.neteinstein.instamaps.feature.share.R
@@ -90,6 +101,7 @@ import org.neteinstein.instamaps.feature.share.R
 fun ShareRoute(
     sharedText: String?,
     onOpenSettings: () -> Unit,
+    onOpenHistory: () -> Unit,
     onNeedsInstagramLogin: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: ShareViewModel = koinViewModel(),
@@ -115,8 +127,10 @@ fun ShareRoute(
         missingPermissions = missingPermissions,
         showInstagramConnectWarning = isInstagramAuthenticated == false,
         onOpenSettings = onOpenSettings,
+        onOpenHistory = onOpenHistory,
         onNeedsInstagramLogin = onNeedsInstagramLogin,
         onDismissAuthRequired = viewModel::dismissAuthRequired,
+        onRetry = viewModel::retry,
         modifier = modifier,
     )
 }
@@ -127,35 +141,32 @@ fun ShareRoute(
  * updating its `stage` field recomposes [ProcessingContent] in place rather than replaying the
  * whole-screen transition on every pipeline progress tick - only the stage icon/label/dots animate.
  *
- * When [uiState] becomes [ShareUiState.Found], automatically opens Google Maps after a short delay
- * so the user gets to see the "found it" moment before being handed off - the button remains as an
- * immediate/manual alternative.
+ * [ShareUiState.Found] never auto-opens Google Maps: Gemini can return more than one candidate
+ * place (see [ResolvedLocation]), so [FoundContent] always lists every one of them and leaves the
+ * choice - and the CTA tap that actually launches Maps - to the user, even when there's only one.
  *
- * [showApiKeyWarning]/[missingPermissions]/[showInstagramConnectWarning]/[onOpenSettings] only
- * affect the [ShareUiState.Idle] branch - the main screen - since that's the only state a user can
- * be looking at while something's missing (processing/found/etc. only happen once [ShareRoute] has
- * already gated on readiness). [ShareUiState.AuthRequired] uses [onNeedsInstagramLogin] too, but
- * reactively - see [ShareRoute]'s doc for why that state exists independently of the Idle warning.
+ * [showApiKeyWarning]/[missingPermissions]/[showInstagramConnectWarning]/[onOpenSettings]/
+ * [onOpenHistory] only affect the [ShareUiState.Idle] branch - the main screen - since that's the
+ * only state a user can be looking at while something's missing (processing/found/etc. only
+ * happen once [ShareRoute] has already gated on readiness). [ShareUiState.AuthRequired] uses
+ * [onNeedsInstagramLogin] too, but reactively - see [ShareRoute]'s doc for why that state exists
+ * independently of the Idle warning. [onRetry] resumes the same video that just failed - offered
+ * on [ShareUiState.NotFound] always, and on [ShareUiState.Error] whenever it carries a `url`.
  */
 @Composable
 fun ShareScreen(
     uiState: ShareUiState,
     onOpenMaps: (MapsDestination) -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenHistory: () -> Unit,
     onNeedsInstagramLogin: () -> Unit,
     modifier: Modifier = Modifier,
     showApiKeyWarning: Boolean = false,
     missingPermissions: List<RuntimePermissionState> = emptyList(),
     showInstagramConnectWarning: Boolean = false,
     onDismissAuthRequired: () -> Unit = {},
+    onRetry: (String) -> Unit = {},
 ) {
-    LaunchedEffect(uiState) {
-        if (uiState is ShareUiState.Found) {
-            delay(AUTO_OPEN_MAPS_DELAY_MS)
-            onOpenMaps(uiState.destination)
-        }
-    }
-
     Surface(modifier = modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         AnimatedContent(
             targetState = uiState,
@@ -175,20 +186,18 @@ fun ShareScreen(
                         missingPermissions = missingPermissions,
                         showInstagramConnectWarning = showInstagramConnectWarning,
                         onOpenSettings = onOpenSettings,
+                        onOpenHistory = onOpenHistory,
                         onConnectInstagram = onNeedsInstagramLogin,
                     )
                 is ShareUiState.Processing -> ProcessingContent(stage = state.stage)
-                is ShareUiState.Found ->
-                    FoundContent(
-                        displayName = state.displayName,
-                        onOpenMaps = { onOpenMaps(state.destination) },
-                    )
+                is ShareUiState.Found -> FoundContent(locations = state.locations, onOpenMaps = onOpenMaps)
                 is ShareUiState.NotFound ->
                     ResultMessageContent(
                         icon = Icons.Default.Place,
                         iconTint = MaterialTheme.colorScheme.onSurfaceVariant,
                         title = stringResource(R.string.share_not_found_title),
                         message = state.message,
+                        onRetry = { onRetry(state.url) },
                     )
                 is ShareUiState.AuthRequired ->
                     AuthRequiredContent(
@@ -202,6 +211,7 @@ fun ShareScreen(
                         iconTint = MaterialTheme.colorScheme.error,
                         title = stringResource(R.string.share_error_title),
                         message = state.message,
+                        onRetry = state.url?.let { url -> { onRetry(url) } },
                     )
             }
         }
@@ -214,12 +224,29 @@ private fun IdleContent(
     missingPermissions: List<RuntimePermissionState>,
     showInstagramConnectWarning: Boolean,
     onOpenSettings: () -> Unit,
+    onOpenHistory: () -> Unit,
     onConnectInstagram: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val idleTransition = rememberInfiniteTransition(label = "idle_pulse")
+    val idleIconScale by idleTransition.animateFloat(
+        initialValue = 0.96f,
+        targetValue = 1.04f,
+        animationSpec =
+            infiniteRepeatable(
+                animation = tween(2200, easing = FastOutSlowInEasing),
+                repeatMode = RepeatMode.Reverse,
+            ),
+        label = "idle_icon_scale",
+    )
+
     Box(modifier = modifier.fillMaxSize()) {
         CenteredContent(Modifier.fillMaxSize()) {
-            IconBadge(icon = Icons.Default.Place, tint = MaterialTheme.colorScheme.onPrimaryContainer)
+            IconBadge(
+                icon = Icons.Default.Place,
+                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                modifier = Modifier.scale(idleIconScale),
+            )
             Spacer(modifier = Modifier.height(24.dp))
             Text(
                 text = stringResource(R.string.share_idle_title),
@@ -265,17 +292,24 @@ private fun IdleContent(
             }
         }
 
-        IconButton(
-            onClick = onOpenSettings,
+        Row(
             // statusBarsPadding() first: MainActivity's enableEdgeToEdge() draws this Box behind
-            // the status bar, so without it the button (and its clip/ripple target) would sit
-            // under the status bar/clock instead of just below it.
+            // the status bar, so without it these buttons (and their clip/ripple targets) would
+            // sit under the status bar/clock instead of just below it.
             modifier = Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(8.dp),
         ) {
-            Icon(
-                imageVector = Icons.Default.Settings,
-                contentDescription = stringResource(R.string.share_settings_button),
-            )
+            IconButton(onClick = onOpenHistory) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.List,
+                    contentDescription = stringResource(R.string.share_history_button),
+                )
+            }
+            IconButton(onClick = onOpenSettings) {
+                Icon(
+                    imageVector = Icons.Default.Settings,
+                    contentDescription = stringResource(R.string.share_settings_button),
+                )
+            }
         }
     }
 }
@@ -321,6 +355,18 @@ private fun ProcessingContent(
             ),
         label = "pulse_alpha",
     )
+    // A tiny, slow wobble on top of the pulse so the processing screen still feels alive during
+    // the (sometimes lengthy) download/OCR/geocode wait, rather than just breathing in place.
+    val pulseRotation by infiniteTransition.animateFloat(
+        initialValue = -4f,
+        targetValue = 4f,
+        animationSpec =
+            infiniteRepeatable(
+                animation = tween(1900, easing = FastOutSlowInEasing),
+                repeatMode = RepeatMode.Reverse,
+            ),
+        label = "pulse_rotation",
+    )
 
     CenteredContent(modifier) {
         Box(contentAlignment = Alignment.Center) {
@@ -330,6 +376,7 @@ private fun ProcessingContent(
                     Modifier
                         .size(96.dp)
                         .scale(pulseScale)
+                        .rotate(pulseRotation)
                         .alpha(pulseAlpha)
                         .background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
                 contentAlignment = Alignment.Center,
@@ -366,15 +413,66 @@ private fun ProcessingContent(
             )
         }
 
+        Spacer(modifier = Modifier.height(8.dp))
+        FlavorLine(stage = stage)
+
         Spacer(modifier = Modifier.height(24.dp))
         StageDots(currentStage = stage)
     }
 }
 
+/**
+ * Rotating pool of short, in-context "what it's actually doing" lines shown under the main stage
+ * label - the app's take on the same kind of flavor text Copilot's own CLI shows while it works,
+ * so the (sometimes lengthy) download/OCR/geocode wait has something to read instead of a static
+ * screen. Resets to the first line of the new stage's pool whenever [stage] changes, so a short
+ * stage is never caught mid-cycle showing a line from the stage before it.
+ */
+@Composable
+private fun FlavorLine(
+    stage: ProcessingStage,
+    modifier: Modifier = Modifier,
+) {
+    val lines = flavorLines(stage)
+    var lineIndex by remember(stage) { mutableIntStateOf(0) }
+
+    LaunchedEffect(stage, lines) {
+        if (lines.size <= 1) return@LaunchedEffect
+        while (true) {
+            delay(FLAVOR_LINE_INTERVAL_MS)
+            lineIndex = (lineIndex + 1) % lines.size
+        }
+    }
+
+    AnimatedContent(
+        targetState = lines.getOrNull(lineIndex),
+        modifier = modifier,
+        transitionSpec = {
+            (fadeIn(tween(300)) + slideInVertically(animationSpec = tween(300)) { it / 3 })
+                .togetherWith(fadeOut(tween(200)) + slideOutVertically(animationSpec = tween(200)) { -it / 3 })
+        },
+        label = "flavor_line",
+    ) { line ->
+        Text(
+            text = line.orEmpty(),
+            style = MaterialTheme.typography.bodyMedium,
+            textAlign = TextAlign.Center,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+/**
+ * Lists every place Gemini identified, ranked most-to-least likely (see [ResolvedLocation]),
+ * inside a [LazyColumn] so all of them stay reachable by scrolling regardless of how many there
+ * are. Nothing here opens Google Maps automatically - not even for a single result - the CTA on
+ * [LocationResultCard] is the only way, so the user always confirms which place is right before
+ * being handed off.
+ */
 @Composable
 private fun FoundContent(
-    displayName: String,
-    onOpenMaps: () -> Unit,
+    locations: List<ResolvedLocation>,
+    onOpenMaps: (MapsDestination) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var badgeVisible by remember { mutableStateOf(false) }
@@ -389,37 +487,84 @@ private fun FoundContent(
         label = "badge_scale",
     )
 
-    CenteredContent(modifier) {
-        Box(contentAlignment = Alignment.BottomEnd) {
-            IconBadge(icon = Icons.Default.Place, tint = MapsGreen)
-            Icon(
-                imageVector = Icons.Default.CheckCircle,
-                contentDescription = null,
-                tint = MapsGreen,
-                modifier =
-                    Modifier
-                        .size(28.dp)
-                        .scale(badgeScale)
-                        .background(MaterialTheme.colorScheme.surface, CircleShape),
+    Column(modifier = modifier.fillMaxSize()) {
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(top = 32.dp, start = 24.dp, end = 24.dp, bottom = 8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Box(contentAlignment = Alignment.BottomEnd) {
+                IconBadge(icon = Icons.Default.Place, tint = MapsGreen)
+                Icon(
+                    imageVector = Icons.Default.CheckCircle,
+                    contentDescription = null,
+                    tint = MapsGreen,
+                    modifier =
+                        Modifier
+                            .size(28.dp)
+                            .scale(badgeScale)
+                            .background(MaterialTheme.colorScheme.surface, CircleShape),
+                )
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+            Text(
+                text =
+                    if (locations.size > 1) {
+                        stringResource(R.string.share_found_multiple_title, locations.size)
+                    } else {
+                        stringResource(R.string.share_found_title)
+                    },
+                style = MaterialTheme.typography.titleLarge,
+                textAlign = TextAlign.Center,
             )
+            if (locations.size > 1) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = stringResource(R.string.share_found_multiple_subtitle),
+                    style = MaterialTheme.typography.bodyMedium,
+                    textAlign = TextAlign.Center,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
 
-        Spacer(modifier = Modifier.height(24.dp))
-        Text(
-            text = stringResource(R.string.share_notification_found_title),
-            style = MaterialTheme.typography.titleLarge,
-            textAlign = TextAlign.Center,
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            text = displayName,
-            style = MaterialTheme.typography.bodyLarge,
-            textAlign = TextAlign.Center,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        LazyColumn(
+            modifier = Modifier.weight(1f).fillMaxWidth(),
+            contentPadding = PaddingValues(start = 24.dp, end = 24.dp, top = 8.dp, bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            items(locations) { location ->
+                LocationResultCard(location = location, onOpenMaps = { onOpenMaps(location.destination) })
+            }
+        }
+    }
+}
 
-        Spacer(modifier = Modifier.height(32.dp))
-        PrimaryButton(text = stringResource(R.string.share_found_open_maps), onClick = onOpenMaps)
+/** One candidate place: name, its address (when Gemini provided one), and the CTA to open it. */
+@Composable
+private fun LocationResultCard(
+    location: ResolvedLocation,
+    onOpenMaps: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Card(modifier = modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(text = location.name, style = MaterialTheme.typography.titleMedium)
+            val address = location.address
+            if (!address.isNullOrBlank()) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = address,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+            PrimaryButton(text = stringResource(R.string.share_found_open_maps), onClick = onOpenMaps)
+        }
     }
 }
 
@@ -430,6 +575,7 @@ private fun ResultMessageContent(
     title: String,
     message: String,
     modifier: Modifier = Modifier,
+    onRetry: (() -> Unit)? = null,
 ) {
     CenteredContent(modifier) {
         IconBadge(icon = icon, tint = iconTint)
@@ -442,6 +588,10 @@ private fun ResultMessageContent(
             textAlign = TextAlign.Center,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        if (onRetry != null) {
+            Spacer(modifier = Modifier.height(32.dp))
+            PrimaryButton(text = stringResource(R.string.share_retry_button), onClick = onRetry)
+        }
     }
 }
 
@@ -538,4 +688,17 @@ private fun stageLabel(stage: ProcessingStage): String =
         ProcessingStage.GEOCODING -> stringResource(R.string.share_stage_geocoding)
     }
 
-private const val AUTO_OPEN_MAPS_DELAY_MS = 1300L
+/** The [FlavorLine] pool for a given stage - see [share_flavor_lines_checking_description] & co. */
+@Composable
+private fun flavorLines(stage: ProcessingStage): List<String> =
+    when (stage) {
+        ProcessingStage.CHECKING_DESCRIPTION ->
+            stringArrayResource(R.array.share_flavor_lines_checking_description)
+        ProcessingStage.DOWNLOADING -> stringArrayResource(R.array.share_flavor_lines_downloading)
+        ProcessingStage.EXTRACTING_FRAMES -> stringArrayResource(R.array.share_flavor_lines_extracting_frames)
+        ProcessingStage.ANALYZING_FRAME -> stringArrayResource(R.array.share_flavor_lines_analyzing_frame)
+        ProcessingStage.GEOCODING -> stringArrayResource(R.array.share_flavor_lines_geocoding)
+    }.toList()
+
+/** How long each [FlavorLine] stays on screen before rotating to the next one in the pool. */
+private const val FLAVOR_LINE_INTERVAL_MS = 2200L

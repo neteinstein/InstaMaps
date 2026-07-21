@@ -12,6 +12,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import org.koin.android.ext.android.inject
 import org.neteinstein.instamaps.core.designsystem.theme.InstaMapsTheme
+import org.neteinstein.instamaps.feature.history.presentation.HistoryRoute
 import org.neteinstein.instamaps.feature.instagramauth.presentation.InstagramLoginRoute
 import org.neteinstein.instamaps.feature.maps.MapsLauncher
 import org.neteinstein.instamaps.feature.maps.domain.MapsDestination
@@ -39,8 +40,9 @@ import org.neteinstein.instamaps.feature.share.work.ShareDeepLink
  *    place): a pure trampoline - hand off to [MapsLauncher] and finish immediately, without ever
  *    drawing this app's own UI, since the pipeline already completed in the background.
  *
- * Also owns the Share/Settings/Instagram-login switch: there's no Navigation-Compose in this app,
- * so opening Settings (the top-right button on the main screen) or the Instagram login screen
+ * Also owns the Share/Settings/History/Instagram-login switch: there's no Navigation-Compose in
+ * this app, so opening Settings or History (the top-right buttons on the main screen) or the
+ * Instagram login screen
  * (from a warning banner or [org.neteinstein.instamaps.feature.share.presentation.ShareUiState.AuthRequired])
  * is just a local [Screen] flag flipped back by that screen's own back arrow, a successful login,
  * or the system back gesture/button.
@@ -67,6 +69,7 @@ class MainActivity : ComponentActivity() {
 
                 when (screen) {
                     Screen.SETTINGS -> SettingsRoute(onBack = { screen = Screen.SHARE })
+                    Screen.HISTORY -> HistoryRoute(onBack = { screen = Screen.SHARE })
                     Screen.INSTAGRAM_LOGIN ->
                         InstagramLoginRoute(
                             onBack = { screen = Screen.SHARE },
@@ -76,6 +79,7 @@ class MainActivity : ComponentActivity() {
                         ShareRoute(
                             sharedText = sharedText,
                             onOpenSettings = { screen = Screen.SETTINGS },
+                            onOpenHistory = { screen = Screen.HISTORY },
                             onNeedsInstagramLogin = { screen = Screen.INSTAGRAM_LOGIN },
                         )
                 }
@@ -111,5 +115,5 @@ class MainActivity : ComponentActivity() {
         return getStringExtra(Intent.EXTRA_TEXT)
     }
 
-    private enum class Screen { SHARE, SETTINGS, INSTAGRAM_LOGIN }
+    private enum class Screen { SHARE, SETTINGS, HISTORY, INSTAGRAM_LOGIN }
 }

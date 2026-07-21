@@ -20,13 +20,19 @@ deep link straight into Google Maps. Everything runs on-device; there is no back
    frame or walks P/B-frames).
 4. **OCR + entity extraction**: each frame goes through on-device Google ML Kit (Text Recognition,
    then Entity Extraction) to pull out addresses, place names, and location text.
-5. **Location resolution**: all collected text (caption + OCR) is sent to the Gemini Flash API, which identifies the specific place and returns a Google Maps location.
-6. **Deep link**: a `https://www.google.com/maps/search/?api=1&query=...` link is fired at the
-   Google Maps app (falling back to a browser if Maps isn't installed).
+5. **Location resolution**: all collected text (caption + OCR) is sent to the Gemini Flash API,
+   which identifies every place the video is actually about - usually just one, but a caption or
+   OCR pass often surfaces more (the featured spot, a mentioned neighborhood, a chain's other
+   locations) - ranked most-to-least likely.
+6. **Pick & deep link**: the results screen lists every match found (name, address, and its own
+   "Open in Google Maps" button), scrollable if there's more than one - picking one fires a
+   `https://www.google.com/maps/search/?api=1&query=...` deep link at the Google Maps app (falling
+   back to a browser if Maps isn't installed).
 
 The whole pipeline runs in a `WorkManager` background job, so it keeps running even after you
-background the app to go back to Instagram/TikTok - a notification pops when the place is found,
-tap it to jump straight into Maps.
+background the app to go back to Instagram/TikTok - a notification pops once a place is found,
+naming the top match (plus "+N more" if the video turned up several) and jumping straight into
+Maps for it when tapped. Stay in the app instead and you get to see every match and choose.
 
 ## Requirements
 
@@ -77,6 +83,30 @@ stores it on-device only (Jetpack DataStore) and never sends it anywhere except 
 Google's Gemini API. If the key ever leaks, revoke/regenerate it from the same
 [API key page](https://aistudio.google.com/apikey) and paste the new one into Settings.
 
+### Setting up prepaid billing (optional)
+
+The Free Tier above is enough to try InstaMaps out, but its rate limits are low - if you use the
+app a lot and start seeing Gemini rate-limit errors, upgrade your key's project to a Paid Tier by
+linking a Google Cloud billing account and prepaying credits:
+
+1. Go to the AI Studio [Billing](https://aistudio.google.com/billing) page (or the
+   [API keys](https://aistudio.google.com/api-keys)/[Projects](https://aistudio.google.com/projects)
+   page - anywhere you see a **Set up billing** button) and click **Set up billing** next to the
+   project your key belongs to.
+2. If you've never set up a Google billing account before, select your country, agree to the
+   Terms of Service, then fill in your contact info and payment method. If you already have a
+   billing account, you can pick it instead of creating a new one.
+3. Prepay a minimum of $10 (or the equivalent in your currency) in credits - this is the default
+   **Prepay** billing plan. Gemini API usage is deducted from that credit balance in near
+   real-time; once it hits $0, every key under that billing account stops working until you buy
+   more credits.
+4. Optionally, turn on **auto-reload** on the Billing page so credits top up automatically before
+   running out, and set a monthly auto-charge limit to cap how much can be auto-reloaded.
+
+This is entirely optional - InstaMaps works fine on the Free Tier for casual, personal use. See
+Google's [Gemini API billing guide](https://ai.google.dev/gemini-api/docs/billing) for full
+details, current rate limits per tier, and pricing.
+
 ### Instagram login
 
 Logging into Instagram is optional - InstaMaps downloads plenty of public content without it -
@@ -97,9 +127,17 @@ retries that exact video as soon as you log in again.
 
 1. Open Instagram or TikTok, find a video advertising a place, tap Share.
 2. Pick InstaMaps from the share sheet.
-3. Watch the in-app progress animation, or background the app - either way, a notification fires
-   once the place is found.
-4. Tap the notification (or wait for the in-app auto-open) to land on the pin in Google Maps.
+3. Watch the in-app progress animation - it rotates through short lines describing what it's
+   currently doing (downloading, reading the screen, asking Gemini, ...) - or background the app;
+   either way, a notification fires once the place is found.
+4. Pick a result: if the video turned up more than one place, every match is listed (name,
+   address, and its own CTA button), scrollable if there are several - tap the one you want to
+   open it in Google Maps. Tapping the result notification instead jumps straight into Maps for
+   the top match.
+
+If something fails partway through - a download error, no location found in the video, a network
+hiccup - the screen explains what went wrong with a **Retry** button that re-runs the exact same
+video, instead of having to re-share it from Instagram/TikTok.
 
 If the Gemini API key or a required runtime permission is missing, InstaMaps opens to the main
 screen instead of processing the video, showing a warning per missing item with a button to fix
@@ -107,6 +145,13 @@ it (jump to Settings, grant the permission, or open the system app-settings page
 previously denied). Once everything's in place, sharing the same video again - or just waiting,
 since the app also resumes automatically once you fix the last warning if you got there without
 sharing - continues into the normal pipeline.
+
+### History
+
+Every link you share - whether or not a place was found - is kept in a local history list. Tap the
+history icon next to Settings (top right of the main screen) to see the last 50: tap an entry to
+reopen the original video, or, if a place was found for it, tap **Open in Google Maps** to jump
+straight to the top match.
 
 ## Architecture
 

@@ -1,6 +1,6 @@
 package org.neteinstein.instamaps.feature.share.domain
 
-import org.neteinstein.instamaps.feature.maps.domain.MapsDestination
+import org.neteinstein.instamaps.feature.geocoding.domain.ResolvedLocation
 
 /**
  * Progress for the full share-to-maps-link pipeline. Layers geocoding resolution on top of
@@ -19,10 +19,8 @@ sealed class ShareProcessingProgress {
 
     data object Geocoding : ShareProcessingProgress()
 
-    data class Found(
-        val destination: MapsDestination,
-        val displayName: String,
-    ) : ShareProcessingProgress()
+    /** [locations] is never empty - ordered most-to-least likely to be the video's real subject. */
+    data class Found(val locations: List<ResolvedLocation>) : ShareProcessingProgress()
 
     data class NotFound(val message: String) : ShareProcessingProgress()
 

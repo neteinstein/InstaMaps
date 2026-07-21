@@ -1,7 +1,5 @@
 package org.neteinstein.instamaps.feature.geocoding.domain
 
-import org.neteinstein.instamaps.feature.maps.domain.MapsDestination
-
 /**
  * Boundary between the location-resolution domain layer and whatever AI service interprets raw
  * text into a place (Gemini Flash in production; fakeable in tests).
@@ -9,7 +7,9 @@ import org.neteinstein.instamaps.feature.maps.domain.MapsDestination
 interface LocationRepository {
     /**
      * Given all raw text gathered from a video (caption + OCR'd frames), asks the AI to identify
-     * the place being discussed and returns a [MapsDestination] ready to open in Google Maps.
+     * every real-world place being discussed and returns them as a non-empty list of
+     * [ResolvedLocation], ordered from most to least likely to be the one the video is actually
+     * about.
      */
-    suspend fun resolveFromText(text: String): Result<MapsDestination>
+    suspend fun resolveFromText(text: String): Result<List<ResolvedLocation>>
 }

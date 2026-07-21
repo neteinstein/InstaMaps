@@ -5,9 +5,11 @@ import org.koin.android.ext.koin.androidContext
 import org.koin.android.ext.koin.androidLogger
 import org.koin.core.context.startKoin
 import org.neteinstein.instamaps.core.common.di.commonModule
+import org.neteinstein.instamaps.core.history.di.historyModule
 import org.neteinstein.instamaps.core.instagramauth.di.instagramAuthModule
 import org.neteinstein.instamaps.core.settings.di.settingsModule
 import org.neteinstein.instamaps.feature.geocoding.di.geocodingModule
+import org.neteinstein.instamaps.feature.history.di.historyUiModule
 import org.neteinstein.instamaps.feature.instagramauth.di.instagramAuthUiModule
 import org.neteinstein.instamaps.feature.maps.di.mapsModule
 import org.neteinstein.instamaps.feature.settings.di.settingsUiModule
@@ -33,12 +35,14 @@ class InstaMapsApplication : Application() {
                 commonModule,
                 settingsModule,
                 instagramAuthModule,
+                historyModule,
                 mapsModule,
                 geocodingModule,
                 videoProcessingModule,
                 shareModule,
                 settingsUiModule,
                 instagramAuthUiModule,
+                historyUiModule,
             )
         }
     }

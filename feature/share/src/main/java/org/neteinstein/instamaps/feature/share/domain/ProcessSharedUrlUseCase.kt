@@ -12,10 +12,9 @@ import org.neteinstein.instamaps.feature.videoprocessing.domain.CollectAllTextUs
  * 1. Fetches the shared video's caption/description (fast metadata-only fetch).
  * 2. Downloads the video and OCRs every extracted frame to collect all on-screen text.
  * 3. Sends the combined text (caption + all frame OCR) to [resolveLocationUseCase], which calls
- *    the Gemini Flash API with the prompt:
- *    "these are caption and text from a video that talks about a specific place. from those
- *    determine the place and return Google maps location"
- * 4. Emits [ShareProcessingProgress.Found] with the resolved [MapsDestination] on success, or
+ *    the Gemini Flash API asking it to identify every real-world place mentioned, ranked from
+ *    most to least likely to be the one the video is actually about.
+ * 4. Emits [ShareProcessingProgress.Found] with the ranked [ResolvedLocation] list on success, or
  *    [ShareProcessingProgress.NotFound] / [ShareProcessingProgress.Failed] on failure.
  */
 class ProcessSharedUrlUseCase(
@@ -51,14 +50,7 @@ class ProcessSharedUrlUseCase(
             emit(ShareProcessingProgress.Geocoding)
             val combinedText = allTexts.joinToString("\n")
             resolveLocationUseCase(combinedText).fold(
-                onSuccess = { destination ->
-                    emit(
-                        ShareProcessingProgress.Found(
-                            destination = destination,
-                            displayName = destination.query,
-                        ),
-                    )
-                },
+                onSuccess = { locations -> emit(ShareProcessingProgress.Found(locations = locations)) },
                 onFailure = { error ->
                     emit(ShareProcessingProgress.NotFound("Could not identify the location: ${error.message}"))
                 },

@@ -19,9 +19,9 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import org.neteinstein.instamaps.core.instagramauth.domain.ObserveInstagramAuthStateUseCase
 import org.neteinstein.instamaps.core.settings.domain.IsGeminiApiKeyConfiguredUseCase
-import org.neteinstein.instamaps.feature.maps.domain.MapsDestination
 import org.neteinstein.instamaps.feature.share.domain.ParseSharedTextUseCase
 import org.neteinstein.instamaps.feature.share.work.ProcessSharedUrlWorker
+import org.neteinstein.instamaps.feature.share.work.toResolvedLocations
 
 /**
  * Drives [ShareUiState] for the share flow. The actual download/OCR/geocode pipeline runs inside
@@ -97,6 +97,12 @@ class ShareViewModel(
         }
     }
 
+    /** Re-runs the pipeline for [url] - the manual counterpart to [retryIfAuthRequiredPending],
+     * wired to the Retry button [ShareScreen] shows on [ShareUiState.NotFound]/[ShareUiState.Error]. */
+    fun retry(url: String) {
+        enqueueProcessing(url)
+    }
+
     // A new share always wins over whatever the UI was showing for a previous one - each
     // share still runs to completion as its own independent Worker (see
     // ProcessSharedUrlWorker.enqueue), only the UI's attention moves to the latest request.
@@ -109,17 +115,20 @@ class ShareViewModel(
             WorkManager.getInstance(context)
                 .getWorkInfoByIdFlow(request.id)
                 .filterNotNull()
-                .onEach { workInfo -> _uiState.value = workInfo.toUiState() }
+                .onEach { workInfo -> _uiState.value = workInfo.toUiState(url) }
                 .launchIn(viewModelScope)
     }
 
-    private fun WorkInfo.toUiState(): ShareUiState =
+    // [url] comes from the enclosing enqueueProcessing call, not WorkInfo/outputData - it's the
+    // one piece every terminal state below needs in common to support a "retry" action, and it's
+    // already known here regardless of how the Worker reports its result.
+    private fun WorkInfo.toUiState(url: String): ShareUiState =
         when (state) {
             WorkInfo.State.ENQUEUED, WorkInfo.State.BLOCKED, WorkInfo.State.RUNNING ->
                 ShareUiState.Processing(progress.toProcessingStage())
-            WorkInfo.State.SUCCEEDED -> outputData.toFoundUiState()
-            WorkInfo.State.FAILED -> outputData.toFailedUiState()
-            WorkInfo.State.CANCELLED -> ShareUiState.Error("Processing was cancelled")
+            WorkInfo.State.SUCCEEDED -> outputData.toFoundUiState(url)
+            WorkInfo.State.FAILED -> outputData.toFailedUiState(url)
+            WorkInfo.State.CANCELLED -> ShareUiState.Error(message = "Processing was cancelled", url = url)
         }
 
     private fun Data.toProcessingStage(): ProcessingStage =
@@ -131,25 +140,26 @@ class ShareViewModel(
             else -> ProcessingStage.CHECKING_DESCRIPTION
         }
 
-    private fun Data.toFoundUiState(): ShareUiState {
-        val query = getString(ProcessSharedUrlWorker.KEY_MAPS_QUERY)
-        val displayName = getString(ProcessSharedUrlWorker.KEY_DISPLAY_NAME)
-        if (query.isNullOrBlank() || displayName == null) {
-            return ShareUiState.Error("Processing finished with an unexpected result")
+    private fun Data.toFoundUiState(url: String): ShareUiState {
+        val locationsJson = getString(ProcessSharedUrlWorker.KEY_LOCATIONS_JSON)
+        val locations = locationsJson?.let { runCatching { it.toResolvedLocations() }.getOrNull() }
+        if (locations.isNullOrEmpty()) {
+            return ShareUiState.Error(message = "Processing finished with an unexpected result", url = url)
         }
-        return ShareUiState.Found(
-            destination = MapsDestination(query = query, placeId = getString(ProcessSharedUrlWorker.KEY_PLACE_ID)),
-            displayName = displayName,
-        )
+        return ShareUiState.Found(locations = locations)
     }
 
-    private fun Data.toFailedUiState(): ShareUiState {
+    private fun Data.toFailedUiState(url: String): ShareUiState {
         val message = getString(ProcessSharedUrlWorker.KEY_ERROR_MESSAGE) ?: "Something went wrong"
-        val url = getString(ProcessSharedUrlWorker.KEY_URL)
-        if (getBoolean(ProcessSharedUrlWorker.KEY_AUTH_REQUIRED, false) && url != null) {
-            return ShareUiState.AuthRequired(message = message, url = url)
+        val authUrl = getString(ProcessSharedUrlWorker.KEY_URL)
+        if (getBoolean(ProcessSharedUrlWorker.KEY_AUTH_REQUIRED, false) && authUrl != null) {
+            return ShareUiState.AuthRequired(message = message, url = authUrl)
         }
         val notFound = getBoolean(ProcessSharedUrlWorker.KEY_NOT_FOUND, false)
-        return if (notFound) ShareUiState.NotFound(message) else ShareUiState.Error(message)
+        return if (notFound) {
+            ShareUiState.NotFound(message = message, url = url)
+        } else {
+            ShareUiState.Error(message = message, url = url)
+        }
     }
 }

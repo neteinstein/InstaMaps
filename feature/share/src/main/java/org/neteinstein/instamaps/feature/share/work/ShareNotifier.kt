@@ -13,7 +13,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import androidx.work.ForegroundInfo
-import org.neteinstein.instamaps.feature.maps.domain.MapsDestination
+import org.neteinstein.instamaps.feature.geocoding.domain.ResolvedLocation
 import org.neteinstein.instamaps.feature.share.R
 
 /**
@@ -43,15 +43,22 @@ class ShareNotifier(
         }
     }
 
-    fun notifyFound(
-        destination: MapsDestination,
-        displayName: String,
-    ) {
+    /**
+     * Tapping the notification trampolines straight into Maps for [locations]' top-ranked pick,
+     * even when Gemini returned more than one candidate: rebuilding a full in-app picker from a
+     * cold, killed-process start (the scenario this notification exists for in the first place -
+     * see the class doc) would need its own navigation/state-restoration plumbing for what's a
+     * rare edge case, whereas the in-app results screen (still shown if the app is/was in the
+     * foreground) always lists every candidate. The notification text says so explicitly when
+     * there's more than one, so nothing is silently hidden from the user.
+     */
+    fun notifyFound(locations: List<ResolvedLocation>) {
+        val topPick = locations.firstOrNull() ?: return
         val intent =
             Intent(ShareDeepLink.ACTION_OPEN_MAPS_DESTINATION).apply {
                 setPackage(context.packageName)
-                putExtra(ShareDeepLink.EXTRA_MAPS_QUERY, destination.query)
-                putExtra(ShareDeepLink.EXTRA_PLACE_ID, destination.placeId)
+                putExtra(ShareDeepLink.EXTRA_MAPS_QUERY, topPick.destination.query)
+                putExtra(ShareDeepLink.EXTRA_PLACE_ID, topPick.destination.placeId)
             }
         val pendingIntent =
             PendingIntent.getActivity(
@@ -61,9 +68,17 @@ class ShareNotifier(
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
             )
 
+        val extraCount = locations.size - 1
+        val text =
+            if (extraCount > 0) {
+                context.getString(R.string.share_notification_found_multiple_text, topPick.name, extraCount)
+            } else {
+                topPick.name
+            }
+
         postResultNotification(
             title = context.getString(R.string.share_notification_found_title),
-            text = displayName,
+            text = text,
             pendingIntent = pendingIntent,
         )
     }
