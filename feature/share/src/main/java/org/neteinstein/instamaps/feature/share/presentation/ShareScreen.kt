@@ -278,6 +278,13 @@ private fun IdleContent(
     }
 }
 
+/**
+ * The animated pin/pulse + stage label shown while `ProcessSharedUrlWorker` runs. Ends with a
+ * non-dismissable [BannerTone.INFO] [WarningBanner] reassuring the user this work survives them
+ * leaving the screen - the worker is expedited `WorkManager` work running under a foreground
+ * "processing" notification, and `ShareNotifier` posts a terminal result notification the moment
+ * it finishes, so the claim holds even if the app is fully backgrounded.
+ */
 @Composable
 private fun ProcessingContent(
     stage: ProcessingStage,
@@ -367,6 +374,12 @@ private fun ProcessingContent(
 
         Spacer(modifier = Modifier.height(24.dp))
         StageDots(currentStage = stage)
+
+        Spacer(modifier = Modifier.height(24.dp))
+        WarningBanner(
+            message = stringResource(R.string.share_processing_background_hint),
+            tone = BannerTone.INFO,
+        )
     }
 }
 

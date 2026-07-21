@@ -30,10 +30,12 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
@@ -87,6 +89,11 @@ fun SettingsRoute(
  * ([ApiKeyValidationStatus.VALIDATING]) and settles into green/red
  * ([ApiKeyValidationStatus.VALID]/[ApiKeyValidationStatus.INVALID]) once it resolves - see
  * [SettingsViewModel.onSaveClicked].
+ *
+ * The permissions section only lists permissions still needing action - a permission already
+ * [RuntimePermissionStatus.GRANTED] has nothing to resolve and nothing worth showing here - and
+ * disappears entirely once none remain, since a Settings screen with nothing left to grant has no
+ * business reserving space for a "Permissions" section.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -153,7 +160,8 @@ fun SettingsScreen(
                 )
             }
 
-            if (permissionStates.isNotEmpty()) {
+            val ungrantedPermissionStates = permissionStates.filter { it.status != RuntimePermissionStatus.GRANTED }
+            if (ungrantedPermissionStates.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(24.dp))
                 Text(
                     text = stringResource(R.string.settings_permissions_section_title),
@@ -161,7 +169,7 @@ fun SettingsScreen(
                 )
                 Spacer(modifier = Modifier.height(12.dp))
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    permissionStates.forEach { permissionState ->
+                    ungrantedPermissionStates.forEach { permissionState ->
                         PermissionStatusRow(permissionState = permissionState)
                     }
                 }
@@ -214,7 +222,12 @@ private fun apiKeySaveButtonTone(validationStatus: ApiKeyValidationStatus): Butt
  * every state except while a check/download is actually in flight, so
  * [UpdateStatus.SideloadingBlocked]/[UpdateStatus.Failed]/[UpdateStatus.UpToDate] can all be
  * retried with a plain second tap - e.g. after the user enables sideloading in system Settings and
- * returns to this screen.
+ * returns to this screen. `settings_update_info` sits above the button so it's clear tapping it
+ * reaches out to this app's own GitHub releases page - not the Play Store - before anything
+ * downloads. [KeepScreenOnWhile] keeps the screen awake for the `isBusy` duration - checking and
+ * downloading both run on a plain coroutine, not a `WorkManager` job, so nothing here survives the
+ * app leaving the foreground; keeping the screen on for that whole stretch is what actually
+ * prevents that, right up through the moment [SettingsViewModel] fires the install prompt.
  */
 @Composable
 private fun UpdateSection(
@@ -225,6 +238,12 @@ private fun UpdateSection(
 ) {
     Column(modifier = modifier.fillMaxWidth()) {
         val isBusy = status is UpdateStatus.Checking || status is UpdateStatus.Downloading
+        KeepScreenOnWhile(keepOn = isBusy)
+        Text(
+            text = stringResource(R.string.settings_update_info),
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.padding(bottom = 8.dp),
+        )
         PrimaryButton(
             text = stringResource(R.string.settings_update_button),
             onClick = onUpdateClicked,
@@ -270,6 +289,26 @@ private fun UpdateStatusRow(
     ) {
         CircularProgressIndicator(modifier = Modifier.width(16.dp).height(16.dp), strokeWidth = 2.dp)
         Text(text = text, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(start = 12.dp))
+    }
+}
+
+/**
+ * Sets [android.view.View.setKeepScreenOn] for as long as [keepOn] is true, and always clears it
+ * on dispose - including when this leaves composition entirely (e.g. the user backs out of
+ * Settings mid-download) - so the flag can never get stuck on past the update flow that requested
+ * it. Used to hold the screen (and therefore this Activity's foreground state) awake for the
+ * whole check-then-download stretch of [SettingsViewModel.onUpdateClicked]: an idle timeout
+ * partway through wouldn't kill the download itself (it runs on a `viewModelScope` coroutine, not
+ * tied to the display), but the system installer `Intent` fired the moment the APK lands is a
+ * foreground-only activity start that the OS silently drops - not queues - if the screen has
+ * already locked by then.
+ */
+@Composable
+private fun KeepScreenOnWhile(keepOn: Boolean) {
+    val view = LocalView.current
+    DisposableEffect(keepOn) {
+        view.keepScreenOn = keepOn
+        onDispose { view.keepScreenOn = false }
     }
 }
 

@@ -20,6 +20,7 @@
     <string name="settings_permission_open_app_settings_cta">Open App Settings</string>
 
     <string name="settings_update_section_title">Updates</string>
+    <string name="settings_update_info">Checks the InstaMaps GitHub releases page for a newer version and downloads it from there - no Play Store needed.</string>
     <string name="settings_update_button">Update to latest</string>
     <string name="settings_update_checking">Checking for updates…</string>
     <string name="settings_update_up_to_date">You\'re on the latest version (%1$s).</string>

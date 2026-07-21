@@ -15,6 +15,7 @@
     <string name="share_stage_extracting_frames">Extracting frames…</string>
     <string name="share_stage_analyzing_frame">Reading on-screen text…</string>
     <string name="share_stage_geocoding">Searching for the place…</string>
+    <string name="share_processing_background_hint">You can leave this screen or go back to the app - InstaMaps keeps working in the background and will notify you the moment it finds the location.</string>
 
     <string name="share_found_open_maps">Open in Google Maps</string>
     <string name="share_found_title">Location found!</string>
