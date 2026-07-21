@@ -6,10 +6,13 @@ import org.koin.android.ext.koin.androidContext
 import org.koin.core.qualifier.named
 import org.koin.dsl.module
 import org.neteinstein.instamaps.core.settings.data.DataStoreAppSettingsRepository
+import org.neteinstein.instamaps.core.settings.data.HttpGeminiApiKeyValidator
 import org.neteinstein.instamaps.core.settings.domain.AppSettingsRepository
+import org.neteinstein.instamaps.core.settings.domain.GeminiApiKeyValidator
 import org.neteinstein.instamaps.core.settings.domain.IsGeminiApiKeyConfiguredUseCase
 import org.neteinstein.instamaps.core.settings.domain.ObserveGeminiApiKeyUseCase
 import org.neteinstein.instamaps.core.settings.domain.SaveGeminiApiKeyUseCase
+import org.neteinstein.instamaps.core.settings.domain.ValidateGeminiApiKeyUseCase
 
 private const val SETTINGS_DATASTORE_FILE_NAME = "app_settings"
 
@@ -39,4 +42,6 @@ val settingsModule =
         single { ObserveGeminiApiKeyUseCase(repository = get()) }
         single { SaveGeminiApiKeyUseCase(repository = get()) }
         single { IsGeminiApiKeyConfiguredUseCase(repository = get()) }
+        single<GeminiApiKeyValidator> { HttpGeminiApiKeyValidator(dispatcherProvider = get()) }
+        single { ValidateGeminiApiKeyUseCase(validator = get()) }
     }
