@@ -105,6 +105,7 @@ dependencies {
     implementation(project(":core:settings"))
     implementation(project(":core:instagramauth"))
     implementation(project(":core:history"))
+    implementation(project(":core:update"))
     implementation(project(":feature:maps"))
     implementation(project(":feature:geocoding"))
     implementation(project(":feature:videoprocessing"))

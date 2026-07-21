@@ -1,21 +1,16 @@
 plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.android)
-    alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ktlint)
     alias(libs.plugins.kover)
 }
 
 android {
-    namespace = "org.neteinstein.instamaps.feature.settings"
+    namespace = "org.neteinstein.instamaps.core.update"
     compileSdk = 36
 
     defaultConfig {
         minSdk = 27
-    }
-
-    buildFeatures {
-        compose = true
     }
 
     compileOptions {
@@ -45,30 +40,21 @@ ktlint {
 
 dependencies {
     implementation(project(":core:common"))
-    implementation(project(":core:designsystem"))
-    implementation(project(":core:settings"))
-    implementation(project(":core:permissions"))
-    implementation(project(":core:update"))
 
+    // androidx.core (pulled in transitively by core-ktx) provides FileProvider, used by
+    // AppUpdateInstaller to hand a downloaded APK to the system Package Installer.
     implementation(libs.androidx.core.ktx)
     implementation(libs.koin.android)
-    implementation(libs.koin.androidx.compose)
     implementation(libs.kotlinx.coroutines.android)
-
-    implementation(libs.androidx.lifecycle.viewmodel.compose)
-    implementation(libs.androidx.lifecycle.runtime.compose)
-
-    implementation(platform(libs.compose.bom))
-    implementation(libs.compose.ui)
-    implementation(libs.compose.ui.graphics)
-    implementation(libs.compose.ui.tooling.preview)
-    implementation(libs.compose.material3)
-    implementation(libs.compose.material.icons.core)
-    debugImplementation(libs.compose.ui.tooling)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.mockito.kotlin)
     testImplementation(libs.mockito.core)
     testImplementation(libs.turbine)
+    // android.jar's org.json classes are compile-only stubs (real bodies throw/return defaults
+    // under `unitTests.isReturnDefaultValues`) - GitHubUpdateRepositoryTest exercises real
+    // JSONObject/JSONArray parsing, so it needs a real desktop implementation of the same org.json
+    // package on the unit test runtime classpath to actually work (see core:history's build.gradle.kts).
+    testImplementation(libs.json)
 }
