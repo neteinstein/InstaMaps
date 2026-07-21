@@ -8,6 +8,7 @@ import org.neteinstein.instamaps.core.common.di.commonModule
 import org.neteinstein.instamaps.core.history.di.historyModule
 import org.neteinstein.instamaps.core.instagramauth.di.instagramAuthModule
 import org.neteinstein.instamaps.core.settings.di.settingsModule
+import org.neteinstein.instamaps.core.update.di.updateModule
 import org.neteinstein.instamaps.feature.geocoding.di.geocodingModule
 import org.neteinstein.instamaps.feature.history.di.historyUiModule
 import org.neteinstein.instamaps.feature.instagramauth.di.instagramAuthUiModule
@@ -37,6 +38,7 @@ class InstaMapsApplication : Application() {
                 settingsModule,
                 instagramAuthModule,
                 historyModule,
+                updateModule,
                 mapsModule,
                 geocodingModule,
                 videoProcessingModule,

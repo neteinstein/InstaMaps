@@ -20,6 +20,7 @@ dependencies {
     kover(project(":core:instagramauth"))
     kover(project(":core:history"))
     kover(project(":core:permissions"))
+    kover(project(":core:update"))
     kover(project(":feature:maps"))
     kover(project(":feature:geocoding"))
     kover(project(":feature:videoprocessing"))
@@ -50,12 +51,20 @@ kover {
                 // `ActivityResultContracts`/`ContextCompat`/`LifecycleEventEffect` Android
                 // framework calls with no meaningfully unit-testable branching of its own. Extend
                 // this list as new UI/framework-glue packages land in feature modules.
+                //
+                // "org.neteinstein.instamaps.core.update" (deliberately without a trailing `*`,
+                // unlike the designsystem/permissions entries above) excludes only that exact
+                // package - i.e. just `AppUpdateInstaller`, the same PackageManager/Intent glue
+                // shape as `core:permissions` - while still fully counting its `.domain`/`.data`
+                // sub-packages, which hold real unit-tested logic (version comparison, GitHub
+                // release JSON parsing).
                 packages(
                     "*.di",
                     "*.presentation",
                     "*.work",
                     "org.neteinstein.instamaps.core.designsystem*",
                     "org.neteinstein.instamaps.core.permissions*",
+                    "org.neteinstein.instamaps.core.update",
                 )
             }
         }

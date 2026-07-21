@@ -18,6 +18,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material3.Card
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -41,6 +42,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.koin.androidx.compose.koinViewModel
 import org.neteinstein.instamaps.core.designsystem.component.ButtonTone
 import org.neteinstein.instamaps.core.designsystem.component.PrimaryButton
+import org.neteinstein.instamaps.core.designsystem.component.WarningBanner
 import org.neteinstein.instamaps.core.designsystem.theme.MapsGreen
 import org.neteinstein.instamaps.core.permissions.RuntimePermissionState
 import org.neteinstein.instamaps.core.permissions.RuntimePermissionStatus
@@ -67,6 +69,8 @@ fun SettingsRoute(
         permissionStates = permissionStates,
         onApiKeyChanged = viewModel::onApiKeyChanged,
         onSaveClicked = viewModel::onSaveClicked,
+        onUpdateClicked = viewModel::onUpdateClicked,
+        onEnableSideloadingClicked = viewModel::onEnableSideloadingClicked,
         onBack = onBack,
         modifier = modifier,
     )
@@ -93,6 +97,8 @@ fun SettingsScreen(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
     permissionStates: List<RuntimePermissionState> = emptyList(),
+    onUpdateClicked: () -> Unit = {},
+    onEnableSideloadingClicked: () -> Unit = {},
 ) {
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -160,6 +166,18 @@ fun SettingsScreen(
                     }
                 }
             }
+
+            Spacer(modifier = Modifier.height(24.dp))
+            Text(
+                text = stringResource(R.string.settings_update_section_title),
+                style = MaterialTheme.typography.titleMedium,
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            UpdateSection(
+                status = uiState.updateStatus,
+                onUpdateClicked = onUpdateClicked,
+                onEnableSideloadingClicked = onEnableSideloadingClicked,
+            )
         }
     }
 }
@@ -189,6 +207,71 @@ private fun apiKeySaveButtonTone(validationStatus: ApiKeyValidationStatus): Butt
         ApiKeyValidationStatus.INVALID -> ButtonTone.ERROR
         ApiKeyValidationStatus.IDLE, ApiKeyValidationStatus.VALIDATING, ApiKeyValidationStatus.UNKNOWN -> ButtonTone.DEFAULT
     }
+
+/**
+ * Button + live status for [UpdateStatus] - checks GitHub Releases and, if allowed, downloads and
+ * installs a newer build (see [SettingsViewModel.onUpdateClicked]). The button stays enabled in
+ * every state except while a check/download is actually in flight, so
+ * [UpdateStatus.SideloadingBlocked]/[UpdateStatus.Failed]/[UpdateStatus.UpToDate] can all be
+ * retried with a plain second tap - e.g. after the user enables sideloading in system Settings and
+ * returns to this screen.
+ */
+@Composable
+private fun UpdateSection(
+    status: UpdateStatus,
+    onUpdateClicked: () -> Unit,
+    onEnableSideloadingClicked: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier.fillMaxWidth()) {
+        val isBusy = status is UpdateStatus.Checking || status is UpdateStatus.Downloading
+        PrimaryButton(
+            text = stringResource(R.string.settings_update_button),
+            onClick = onUpdateClicked,
+            enabled = !isBusy,
+        )
+
+        when (status) {
+            is UpdateStatus.Idle -> Unit
+            is UpdateStatus.Checking -> UpdateStatusRow(text = stringResource(R.string.settings_update_checking))
+            is UpdateStatus.Downloading -> UpdateStatusRow(text = stringResource(R.string.settings_update_downloading))
+            is UpdateStatus.UpToDate ->
+                Text(
+                    text = stringResource(R.string.settings_update_up_to_date, status.currentVersionName),
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(top = 8.dp),
+                )
+            is UpdateStatus.Failed ->
+                Text(
+                    text = status.message,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(top = 8.dp),
+                )
+            is UpdateStatus.SideloadingBlocked ->
+                WarningBanner(
+                    message = stringResource(R.string.settings_update_sideloading_warning),
+                    actionLabel = stringResource(R.string.settings_update_enable_sideloading_cta),
+                    onActionClick = onEnableSideloadingClicked,
+                    modifier = Modifier.padding(top = 12.dp),
+                )
+        }
+    }
+}
+
+@Composable
+private fun UpdateStatusRow(
+    text: String,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier.padding(top = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        CircularProgressIndicator(modifier = Modifier.width(16.dp).height(16.dp), strokeWidth = 2.dp)
+        Text(text = text, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(start = 12.dp))
+    }
+}
 
 /**
  * One permission: its name, live status pill, and - only while unresolved - a small action that
