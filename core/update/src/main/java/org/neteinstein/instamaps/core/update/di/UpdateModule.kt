@@ -5,6 +5,7 @@ import org.koin.dsl.module
 import org.neteinstein.instamaps.core.update.AppUpdateInstaller
 import org.neteinstein.instamaps.core.update.data.GitHubUpdateRepository
 import org.neteinstein.instamaps.core.update.domain.CheckForUpdateUseCase
+import org.neteinstein.instamaps.core.update.domain.ClearDownloadedUpdateUseCase
 import org.neteinstein.instamaps.core.update.domain.DownloadAppUpdateUseCase
 import org.neteinstein.instamaps.core.update.domain.UpdateRepository
 
@@ -19,5 +20,6 @@ val updateModule =
         single<UpdateRepository> { GitHubUpdateRepository(context = androidContext(), dispatcherProvider = get()) }
         factory { CheckForUpdateUseCase(repository = get()) }
         factory { DownloadAppUpdateUseCase(repository = get()) }
+        factory { ClearDownloadedUpdateUseCase(repository = get()) }
         single { AppUpdateInstaller(androidContext()) }
     }

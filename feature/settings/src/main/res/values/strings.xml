@@ -10,6 +10,15 @@
     <string name="settings_api_key_validation_unknown">Saved. Couldn\'t verify the key right now - check your connection.</string>
     <string name="settings_save">Save</string>
 
+    <string name="settings_test_link_section_title">Test a link</string>
+    <string name="settings_test_link_label">Instagram or TikTok link</string>
+    <string name="settings_test_link_supporting_text">Runs the same pipeline as sharing a link from Instagram or TikTok, without leaving Settings.</string>
+    <string name="settings_test_link_button">Test</string>
+
+    <string name="settings_language_section_title">Language</string>
+    <string name="settings_language_info">Change the language InstaMaps is displayed in from your device\'s Settings.</string>
+    <string name="settings_language_button">Change language</string>
+
     <string name="settings_permissions_section_title">Permissions</string>
     <string name="settings_permission_notifications_label">Notifications</string>
     <string name="settings_permission_generic_label">Permission</string>

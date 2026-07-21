@@ -94,6 +94,12 @@ import org.neteinstein.instamaps.feature.share.R
  * never part of the app-wide readiness gate. A missing session only shows as a dismissible nudge
  * on this idle screen, and only actually interrupts a share reactively, if yt-dlp itself reports
  * the specific video needs a login (see [ShareUiState.AuthRequired]).
+ *
+ * [sharedTextRequestId] only exists so [MainActivity][org.neteinstein.instamaps.presentation.MainActivity]
+ * can force a fresh run even when [sharedText] is textually identical to the last request (e.g.
+ * the user submits the exact same link twice in a row from `feature:settings`'s "Test a link"
+ * field, or re-shares the exact same post) - [LaunchedEffect] only restarts when one of its keys
+ * actually changes, and an unchanged `String` key alone would silently no-op the second request.
  */
 @Composable
 fun ShareRoute(
@@ -102,12 +108,13 @@ fun ShareRoute(
     onOpenHistory: () -> Unit,
     onNeedsInstagramLogin: () -> Unit,
     modifier: Modifier = Modifier,
+    sharedTextRequestId: Long = 0L,
     viewModel: ShareViewModel = koinViewModel(),
     mapsLauncher: MapsLauncher = koinInject(),
 ) {
     val isInstagramAuthenticated by viewModel.isInstagramAuthenticated.collectAsStateWithLifecycle()
 
-    LaunchedEffect(sharedText) {
+    LaunchedEffect(sharedText, sharedTextRequestId) {
         if (sharedText != null) {
             viewModel.onSharedTextReceived(sharedText)
         }

@@ -10,14 +10,21 @@ import java.io.File
 private class FakeUpdateRepository(
     private val checkResult: Result<UpdateCheckResult> = Result.success(UpdateCheckResult.UpToDate("1.0.0")),
     private val downloadResult: Result<File> = Result.success(File("/tmp/InstaMaps.apk")),
+    private val clearResult: Result<Unit> = Result.success(Unit),
 ) : UpdateRepository {
     var downloadedUpdate: AppUpdate? = null
+    var clearDownloadedUpdateCallCount = 0
 
     override suspend fun checkForUpdate(): Result<UpdateCheckResult> = checkResult
 
     override suspend fun downloadUpdate(update: AppUpdate): Result<File> {
         downloadedUpdate = update
         return downloadResult
+    }
+
+    override suspend fun clearDownloadedUpdate(): Result<Unit> {
+        clearDownloadedUpdateCallCount++
+        return clearResult
     }
 }
 
@@ -93,5 +100,41 @@ class DownloadAppUpdateUseCaseTest {
             val result = useCase(AppUpdate(versionName = "1.0.17", apkDownloadUrl = "https://example.com/app.apk"))
 
             assertTrue(result.exceptionOrNull() is AppError.Network)
+        }
+}
+
+class ClearDownloadedUpdateUseCaseTest {
+    @Test
+    fun `delegates to the repository`() =
+        runTest {
+            val repository = FakeUpdateRepository()
+            val useCase = ClearDownloadedUpdateUseCase(repository)
+
+            useCase()
+
+            assertEquals(1, repository.clearDownloadedUpdateCallCount)
+        }
+
+    @Test
+    fun `returns success from the repository`() =
+        runTest {
+            val repository = FakeUpdateRepository()
+            val useCase = ClearDownloadedUpdateUseCase(repository)
+
+            val result = useCase()
+
+            assertTrue(result.isSuccess)
+        }
+
+    @Test
+    fun `propagates repository failure unchanged`() =
+        runTest {
+            val error = AppError.Unknown(cause = RuntimeException("disk error"))
+            val repository = FakeUpdateRepository(clearResult = Result.failure(error))
+            val useCase = ClearDownloadedUpdateUseCase(repository)
+
+            val result = useCase()
+
+            assertTrue(result.exceptionOrNull() is AppError.Unknown)
         }
 }

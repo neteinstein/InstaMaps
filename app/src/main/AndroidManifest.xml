@@ -26,6 +26,7 @@
         android:fullBackupContent="@xml/full_backup_content"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
+        android:localeConfig="@xml/locales_config"
         android:supportsRtl="true"
         android:theme="@style/Theme.InstaMaps">
 
@@ -83,6 +84,20 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/update_file_paths" />
         </provider>
+
+        <!-- Deletes the APK GitHubUpdateRepository downloaded to context.cacheDir once InstaMaps
+             finishes installing it, so it doesn't sit there wasting space. MY_PACKAGE_REPLACED is
+             one of the few broadcasts exempted from Android 8+'s implicit-broadcast background
+             restrictions, and is only delivered to the app that was just updated - see
+             UpdateApkCleanupReceiver. Must be manifest-declared (not registered at runtime) since
+             the app process is commonly killed during its own update install. -->
+        <receiver
+            android:name="org.neteinstein.instamaps.core.update.UpdateApkCleanupReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
 
     </application>
 </manifest>

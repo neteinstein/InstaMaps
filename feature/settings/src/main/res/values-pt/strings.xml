@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_title">Configurações</string>
+    <string name="settings_back">Voltar</string>
+    <string name="settings_api_key_label">Chave de API do Gemini</string>
+    <string name="settings_api_key_supporting_text">Necessária para o InstaMaps identificar locais. Obtenha uma chave gratuita no Google AI Studio (aistudio.google.com/apikey).</string>
+    <string name="settings_api_key_validating">Verificando chave…</string>
+    <string name="settings_api_key_valid">Salva. Essa chave funciona.</string>
+    <string name="settings_api_key_invalid">Salva, mas essa chave não parece válida. Confira novamente no Google AI Studio.</string>
+    <string name="settings_api_key_validation_unknown">Salva. Não foi possível verificar a chave agora - confira sua conexão.</string>
+    <string name="settings_save">Salvar</string>
+
+    <string name="settings_test_link_section_title">Testar um link</string>
+    <string name="settings_test_link_label">Link do Instagram ou TikTok</string>
+    <string name="settings_test_link_supporting_text">Executa o mesmo processo de compartilhar um link do Instagram ou TikTok, sem sair de Configurações.</string>
+    <string name="settings_test_link_button">Testar</string>
+
+    <string name="settings_language_section_title">Idioma</string>
+    <string name="settings_language_info">Altere o idioma de exibição do InstaMaps nas configurações do seu dispositivo.</string>
+    <string name="settings_language_button">Alterar idioma</string>
+
+    <string name="settings_permissions_section_title">Permissões</string>
+    <string name="settings_permission_notifications_label">Notificações</string>
+    <string name="settings_permission_generic_label">Permissão</string>
+    <string name="settings_permission_status_granted">Concedida</string>
+    <string name="settings_permission_status_not_granted">Não concedida</string>
+    <string name="settings_permission_status_blocked">Bloqueada</string>
+    <string name="settings_permission_grant_cta">Conceder</string>
+    <string name="settings_permission_open_app_settings_cta">Abrir Configurações do app</string>
+
+    <string name="settings_update_section_title">Atualizações</string>
+    <string name="settings_update_info">Verifica a página de releases do InstaMaps no GitHub em busca de uma versão mais recente e a baixa de lá - sem precisar da Play Store.</string>
+    <string name="settings_update_button">Atualizar para a mais recente</string>
+    <string name="settings_update_checking">Verificando atualizações…</string>
+    <string name="settings_update_up_to_date">Você está na versão mais recente (%1$s).</string>
+    <string name="settings_update_downloading">Baixando atualização…</string>
+    <string name="settings_update_sideloading_warning">Para instalar essa atualização, permita que o InstaMaps instale apps desconhecidos.</string>
+    <string name="settings_update_enable_sideloading_cta">Ativar</string>
+</resources>

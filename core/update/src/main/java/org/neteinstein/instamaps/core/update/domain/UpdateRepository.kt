@@ -18,4 +18,11 @@ interface UpdateRepository {
 
     /** Downloads [update]'s APK to local storage, returning the file it was written to. */
     suspend fun downloadUpdate(update: AppUpdate): Result<File>
+
+    /**
+     * Deletes any APK previously written by [downloadUpdate] - called once the system finishes
+     * installing it (see `core:update`'s `UpdateApkCleanupReceiver`) so it doesn't sit in the
+     * cache directory forever wasting space. A no-op, not a failure, if nothing was downloaded.
+     */
+    suspend fun clearDownloadedUpdate(): Result<Unit>
 }
