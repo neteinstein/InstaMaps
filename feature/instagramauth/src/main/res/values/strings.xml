@@ -3,4 +3,6 @@
     <string name="instagram_login_title">Connect Instagram</string>
     <string name="instagram_login_back">Back</string>
     <string name="instagram_login_explanation">Log in to Instagram so InstaMaps can fetch video locations more reliably. InstaMaps only stores your session, never your password.</string>
+    <string name="instagram_login_cookie_hint">If a cookie pop-up is blocking the page below, tap Accept cookies to dismiss it and continue.</string>
+    <string name="instagram_login_accept_cookies">Accept cookies</string>
 </resources>
