@@ -3,6 +3,7 @@
     <string name="share_notification_channel_name">Location processing</string>
     <string name="share_notification_processing_title">Finding the location…</string>
     <string name="share_notification_found_title">Location found!</string>
+    <string name="share_notification_found_multiple_text">%1$s (+%2$d more found - open the app to see all)</string>
     <string name="share_notification_not_found_title">No location found</string>
     <string name="share_notification_failed_title">Something went wrong</string>
 
@@ -16,10 +17,15 @@
     <string name="share_stage_geocoding">Searching for the place…</string>
 
     <string name="share_found_open_maps">Open in Google Maps</string>
+    <string name="share_found_title">Location found!</string>
+    <string name="share_found_multiple_title">%1$d locations found!</string>
+    <string name="share_found_multiple_subtitle">Tap the one you\'re looking for to open it in Google Maps.</string>
     <string name="share_not_found_title">No location found</string>
     <string name="share_error_title">Something went wrong</string>
+    <string name="share_retry_button">Try again</string>
 
     <string name="share_settings_button">Settings</string>
+    <string name="share_history_button">History</string>
     <string name="share_warning_missing_api_key">Add a Gemini API key in Settings so InstaMaps can identify locations.</string>
     <string name="share_warning_open_settings">Open Settings</string>
     <string name="share_warning_missing_notifications_permission">Allow notifications so InstaMaps can tell you when a location is found.</string>
@@ -32,4 +38,31 @@
     <string name="share_auth_required_title">Instagram login needed</string>
     <string name="share_auth_required_login">Log in to Instagram</string>
     <string name="share_auth_required_dismiss">Not now</string>
+
+    <!-- Rotating "what it's doing" flavor lines shown under the stage label while processing,
+         cycled every FLAVOR_LINE_INTERVAL_MS in ShareScreen's FlavorLine composable. -->
+    <string-array name="share_flavor_lines_checking_description">
+        <item>Skimming the caption for clues…</item>
+        <item>Checking if the poster already gave it away…</item>
+    </string-array>
+    <string-array name="share_flavor_lines_downloading">
+        <item>Grabbing the video…</item>
+        <item>Pulling it down at the smallest size that still reads clearly…</item>
+        <item>Almost got it…</item>
+    </string-array>
+    <string-array name="share_flavor_lines_extracting_frames">
+        <item>Slicing the video into frames…</item>
+        <item>Snapshotting the keyframes…</item>
+        <item>Picking out the frames worth a closer look…</item>
+    </string-array>
+    <string-array name="share_flavor_lines_analyzing_frame">
+        <item>Reading every sign, menu and caption in sight…</item>
+        <item>Squinting at on-screen text…</item>
+        <item>Teaching pixels to spell…</item>
+    </string-array>
+    <string-array name="share_flavor_lines_geocoding">
+        <item>Asking Gemini where on Earth this is…</item>
+        <item>Ranking the likely suspects…</item>
+        <item>Cross-checking names and addresses…</item>
+    </string-array>
 </resources>

@@ -18,6 +18,7 @@ junit = "4.13.2"
 mockitoKotlin = "6.3.0"
 mockitoCore = "5.23.0"
 turbine = "1.2.1"
+json = "20250517"
 
 [libraries]
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "coreKtx" }
@@ -57,6 +58,7 @@ junit = { module = "junit:junit", version.ref = "junit" }
 mockito-kotlin = { module = "org.mockito.kotlin:mockito-kotlin", version.ref = "mockitoKotlin" }
 mockito-core = { module = "org.mockito:mockito-core", version.ref = "mockitoCore" }
 turbine = { module = "app.cash.turbine:turbine", version.ref = "turbine" }
+json = { module = "org.json:json", version.ref = "json" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

@@ -16,6 +16,7 @@ import org.neteinstein.instamaps.core.common.AppError
 import org.neteinstein.instamaps.core.common.DispatcherProvider
 import org.neteinstein.instamaps.feature.geocoding.domain.LocationRepository
 import org.neteinstein.instamaps.feature.geocoding.domain.ResolveLocationUseCase
+import org.neteinstein.instamaps.feature.geocoding.domain.ResolvedLocation
 import org.neteinstein.instamaps.feature.maps.domain.MapsDestination
 import org.neteinstein.instamaps.feature.videoprocessing.domain.CollectAllTextUseCase
 import org.neteinstein.instamaps.feature.videoprocessing.domain.DownloadedVideo
@@ -71,11 +72,11 @@ private class FakeVideoMetadataRepository(
 }
 
 private class FakeLocationRepository(
-    private val result: Result<MapsDestination>,
+    private val result: Result<List<ResolvedLocation>>,
 ) : LocationRepository {
     var lastTextReceived: String? = null
 
-    override suspend fun resolveFromText(text: String): Result<MapsDestination> {
+    override suspend fun resolveFromText(text: String): Result<List<ResolvedLocation>> {
         lastTextReceived = text
         return result
     }
@@ -84,7 +85,16 @@ private class FakeLocationRepository(
 class ProcessSharedUrlUseCaseTest {
     private fun useCaseFor(
         frameText: String,
-        locationResult: Result<MapsDestination> = Result.success(MapsDestination(query = "Central Park, New York, USA")),
+        locationResult: Result<List<ResolvedLocation>> =
+            Result.success(
+                listOf(
+                    ResolvedLocation(
+                        name = "Central Park",
+                        address = "New York, USA",
+                        destination = MapsDestination(query = "Central Park, New York, USA"),
+                    ),
+                ),
+            ),
         videoDownloadResult: Result<DownloadedVideo> = Result.success(DownloadedVideo(File("fake-video.mp4"))),
         descriptionResult: Result<String> = Result.success(""),
     ): Triple<ProcessSharedUrlUseCase, FakeLocationRepository, FakeVideoDownloadRepository> {
@@ -110,29 +120,72 @@ class ProcessSharedUrlUseCaseTest {
     @Test
     fun `resolves to Found when Gemini returns a place`() =
         runTest {
-            val destination = MapsDestination(query = "Central Park, New York, USA")
+            val locations =
+                listOf(
+                    ResolvedLocation(
+                        name = "Central Park",
+                        address = "New York, USA",
+                        destination = MapsDestination(query = "Central Park, New York, USA"),
+                    ),
+                )
             val (useCase, _, _) =
                 useCaseFor(
                     frameText = "Central Park vibes",
-                    locationResult = Result.success(destination),
+                    locationResult = Result.success(locations),
                 )
 
             val progress = useCase("https://instagram.com/reel/abc").toList()
 
             val found = progress.filterIsInstance<ShareProcessingProgress.Found>().single()
-            assertEquals("Central Park, New York, USA", found.displayName)
-            assertEquals("Central Park, New York, USA", found.destination.query)
+            assertEquals(locations, found.locations)
+        }
+
+    @Test
+    fun `resolves to Found with every location Gemini returns, in ranked order`() =
+        runTest {
+            val locations =
+                listOf(
+                    ResolvedLocation(
+                        name = "Eiffel Tower",
+                        address = "Paris, France",
+                        destination = MapsDestination(query = "Eiffel Tower, Paris, France"),
+                    ),
+                    ResolvedLocation(
+                        name = "Trocadéro",
+                        address = "Paris, France",
+                        destination = MapsDestination(query = "Trocadéro, Paris, France"),
+                    ),
+                )
+            val (useCase, _, _) =
+                useCaseFor(
+                    frameText = "Eiffel Tower seen from Trocadéro",
+                    locationResult = Result.success(locations),
+                )
+
+            val progress = useCase("https://instagram.com/reel/abc").toList()
+
+            val found = progress.filterIsInstance<ShareProcessingProgress.Found>().single()
+            assertEquals(2, found.locations.size)
+            assertEquals("Eiffel Tower", found.locations.first().name)
+            assertEquals("Trocadéro", found.locations.last().name)
         }
 
     @Test
     fun `sends combined caption and frame OCR text to Gemini`() =
         runTest {
-            val destination = MapsDestination(query = "Eiffel Tower, Paris, France")
+            val locations =
+                listOf(
+                    ResolvedLocation(
+                        name = "Eiffel Tower",
+                        address = "Paris, France",
+                        destination = MapsDestination(query = "Eiffel Tower, Paris, France"),
+                    ),
+                )
             val (useCase, locationRepository, _) =
                 useCaseFor(
                     frameText = "Tour Eiffel",
                     descriptionResult = Result.success("Paris trip"),
-                    locationResult = Result.success(destination),
+                    locationResult = Result.success(locations),
                 )
 
             useCase("https://instagram.com/reel/abc").toList()

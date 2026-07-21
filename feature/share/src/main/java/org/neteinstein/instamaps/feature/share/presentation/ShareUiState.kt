@@ -1,6 +1,6 @@
 package org.neteinstein.instamaps.feature.share.presentation
 
-import org.neteinstein.instamaps.feature.maps.domain.MapsDestination
+import org.neteinstein.instamaps.feature.geocoding.domain.ResolvedLocation
 
 /**
  * UI state for [ShareViewModel]. Mirrors `ProcessSharedUrlWorker`'s reported stages/result rather
@@ -13,12 +13,11 @@ sealed class ShareUiState {
 
     data class Processing(val stage: ProcessingStage) : ShareUiState()
 
-    data class Found(
-        val destination: MapsDestination,
-        val displayName: String,
-    ) : ShareUiState()
+    /** [locations] is never empty - ordered most-to-least likely to be the video's real subject. */
+    data class Found(val locations: List<ResolvedLocation>) : ShareUiState()
 
-    data class NotFound(val message: String) : ShareUiState()
+    /** [url] is the video that was being processed - carried so the UI can offer a retry button. */
+    data class NotFound(val message: String, val url: String) : ShareUiState()
 
     /**
      * yt-dlp reported that Instagram is demanding a (re-)login for [url] - see
@@ -30,7 +29,13 @@ sealed class ShareUiState {
      */
     data class AuthRequired(val message: String, val url: String) : ShareUiState()
 
-    data class Error(val message: String) : ShareUiState()
+    /**
+     * [url] is the video that was being processed when this failure happened, so the UI can offer
+     * a retry button that resumes the exact same video via [ShareViewModel.retry] - `null` only
+     * when there was no resolved video to retry in the first place (e.g. the shared text itself
+     * didn't contain a recognizable video link).
+     */
+    data class Error(val message: String, val url: String? = null) : ShareUiState()
 }
 
 enum class ProcessingStage {

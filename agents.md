@@ -33,13 +33,15 @@ logic belongs in `core:common` instead.
 | `core:designsystem`      | Compose UI, theme   | Shared Compose theme/typography + reusable components (`PrimaryButton`, `LoadingIndicator`, `ErrorMessage`, `WarningBanner`) | Active |
 | `core:settings`          | domain, data, di    | `AppSettingsRepository` - persists the user-entered Gemini API key in Jetpack DataStore Preferences (covered by the app's Auto Backup, so it syncs to a user's other devices) | Active |
 | `core:instagramauth`     | domain, data, di    | `InstagramAuthRepository` - persists the Instagram session cookie captured by `feature:instagramauth`'s WebView login, encrypting it with an AndroidKeystore-backed AES-256-GCM key (`AndroidKeystoreInstagramSessionCipher`) before it touches Jetpack DataStore Preferences. Deliberately *excluded* from Auto Backup/device transfer (unlike `core:settings`) since the Keystore key never leaves the device and a restored file alone would be undecryptable - see `app`'s `data_extraction_rules.xml`/`full_backup_content.xml` | Active |
+| `core:history`           | domain, data, di    | `HistoryRepository`/`ObserveHistoryUseCase`/`RecordHistoryEntryUseCase` - persists the last 50 shared links (`MAX_HISTORY_ENTRIES`) plus whatever locations were found for each, as one JSON-array string in its own Jetpack DataStore Preferences file. Deliberately defines its own minimal `HistoryLocation(name, address)` rather than depending on `feature:geocoding`'s `ResolvedLocation` - core modules never depend on feature modules - so `feature:share`'s `ProcessSharedUrlWorker` does that mapping when recording an entry | Active |
 | `feature:maps`           | domain, di          | Builds the Google Maps deep link (`BuildMapsDeepLinkUseCase`) and launches it (`MapsLauncher`, with a browser fallback if the Maps app isn't installed) | Active |
-| `feature:geocoding`      | domain, data, di    | `ResolveLocationUseCase` backed by the Gemini Flash REST API (`GeminiLocationRepository`) - sends all collected text (caption + video OCR) to Gemini with a location-identification prompt and returns a `MapsDestination` ready for Google Maps | Active |
+| `feature:geocoding`      | domain, data, di    | `ResolveLocationUseCase` backed by the Gemini Flash REST API (`GeminiLocationRepository`) - sends all collected text (caption + video OCR) to Gemini with a location-identification prompt and returns every place it identifies (`List<ResolvedLocation>`, most-to-least likely) each ready for Google Maps | Active |
 | `feature:videoprocessing`| domain, data, di    | Downloads the shared video (yt-dlp), extracts frames (`MediaMetadataRetriever`), OCRs them (ML Kit text recognition + entity extraction), turns raw text into `LocationCandidate`s. `YtDlpVideoDownloadRepository` attaches the persisted Instagram session cookie (`core:instagramauth`) to downloads when one is saved, and classifies a yt-dlp failure as `AppError.AuthenticationRequired` only when the source URL is actually an Instagram host, so a TikTok failure is never misattributed to a missing Instagram login | Active |
-| `feature:share`          | domain, presentation, work, di | Parses the shared URL, runs the video pipeline via `feature:videoprocessing`/`feature:geocoding` to resolve a `MapsDestination`, drives it from a `WorkManager` `CoroutineWorker` (survives the app being backgrounded) with a result notification, and renders an animated Compose UI (`ShareScreen`) that mirrors the same job. The idle/main screen also renders readiness warnings (missing API key, missing runtime permissions) with per-item action buttons, and gates auto-starting the pipeline on a shared video until they're resolved. It also shows a non-blocking "Connect Instagram" nudge banner when no session is saved, and reacts to an `AppError.AuthenticationRequired` failure by surfacing a dedicated login prompt (`ShareUiState.AuthRequired`) that automatically retries the same video the moment a fresh session is saved | Active |
+| `feature:share`          | domain, presentation, work, di | Parses the shared URL, runs the video pipeline via `feature:videoprocessing`/`feature:geocoding` to resolve a ranked `List<ResolvedLocation>`, drives it from a `WorkManager` `CoroutineWorker` (survives the app being backgrounded) with a result notification (deep-links straight to the top-ranked match) and a matching animated Compose UI (`ShareScreen`) that lists every match found (scrollable) for the user to pick from instead of auto-opening Maps. `ProcessSharedUrlWorker` also records every terminal outcome - found, not-found, or failed - to `core:history` via `RecordHistoryEntryUseCase`. The idle/main screen also renders readiness warnings (missing API key, missing runtime permissions) with per-item action buttons, and gates auto-starting the pipeline on a shared video until they're resolved. It also shows a non-blocking "Connect Instagram" nudge banner when no session is saved, reacts to an `AppError.AuthenticationRequired` failure by surfacing a dedicated login prompt (`ShareUiState.AuthRequired`) that automatically retries the same video the moment a fresh session is saved, and offers a manual **Retry** button on any other failed/not-found outcome | Active |
 | `feature:settings`       | presentation, di    | The Settings screen (`SettingsScreen`/`SettingsViewModel`) the user pastes their Gemini API key into - reachable from the top-right button on `feature:share`'s main screen; delegates persistence to `core:settings` | Active |
 | `feature:instagramauth`  | presentation, di    | The Instagram login screen (`InstagramLoginScreen`/`InstagramLoginViewModel`): a `WebView` pointed at Instagram's own login page - InstaMaps never sees the entered password, only detects the `sessionid` cookie once login succeeds, then hands it to `core:instagramauth` to persist | Active |
-| `app`                    | presentation        | Composition root: `InstaMapsApplication` starts Koin with every feature/core module; `MainActivity` is the single UI entry point, handling launcher taps, the Instagram/TikTok share target, the result-notification deep-link trampoline into `MapsLauncher`, and switching between the main (`feature:share`), Settings (`feature:settings`), and Instagram login (`feature:instagramauth`) screens | Active |
+| `feature:history`        | presentation, di    | The History screen (`HistoryRoute`/`HistoryViewModel`) - reachable from the icon next to Settings on `feature:share`'s main screen - lists `core:history`'s last-50 entries newest-first, each tappable to reopen the original video (`Intent.ACTION_VIEW`) with an "Open in Google Maps" CTA (via `feature:maps`) for the top-ranked location found, if any | Active |
+| `app`                    | presentation        | Composition root: `InstaMapsApplication` starts Koin with every feature/core module; `MainActivity` is the single UI entry point, handling launcher taps, the Instagram/TikTok share target, the result-notification deep-link trampoline into `MapsLauncher`, and switching between the main (`feature:share`), History (`feature:history`), Settings (`feature:settings`), and Instagram login (`feature:instagramauth`) screens | Active |
 
 `settings.gradle.kts` is the source of truth for which modules are part of the build - a module
 commented out there is not compiled, tested, or linted, and should not be assumed to exist.
@@ -54,7 +56,12 @@ commented out there is not compiled, tested, or linted, and should not be assume
   so tests can inject a test dispatcher instead of patching `Dispatchers.Main`)
 - **DI**: Koin (`koin-android`, `koin-androidx-compose`) - constructor injection into use cases
   and repositories, `koinViewModel()` in Compose. `InstaMapsApplication` (in `app`) is the single
-  `startKoin { }` call site, wiring every feature/core module's Koin module together
+  `startKoin { }` call site, wiring every feature/core module's Koin module together. Every core
+  module that persists its own `DataStore<Preferences>` (`core:settings`, `core:instagramauth`,
+  `core:history`) must bind it with a `named(...)` qualifier - Koin resolves `single<DataStore<Preferences>>`
+  by type alone, so two unqualified bindings silently shadow each other (the second-registered
+  module's reads/writes go to the wrong file) instead of failing loudly. Give any new
+  DataStore-backed module its own qualifier from the start
 - **Video download**: yt-dlp via `youtubedl-android`, forced to `-f "bv*+ba/b" -S "res:480"` to keep
   the download small and the on-device decode fast. Deliberately a format *sort* (`-S`), not a
   *filter* (`-f ...[height<=480]`): a filter hard-eliminates every format that doesn't match, which
@@ -82,17 +89,27 @@ commented out there is not compiled, tested, or linted, and should not be assume
 - **OCR / entity extraction**: Google ML Kit, on-device Text Recognition + Entity Extraction
 - **Location resolution**: Gemini Flash REST API, via the `gemini-flash-latest` model alias so the
   integration keeps working as Google retires/replaces pinned model versions (via
-  `java.net.HttpURLConnection` + `org.json`) - no additional SDK dependency
+  `java.net.HttpURLConnection` + `org.json`) - no additional SDK dependency. The prompt asks for
+  every place the video is actually about, ranked most-to-least likely, since a caption or OCR
+  pass often surfaces more than one candidate (the featured spot, a mentioned neighborhood, a
+  chain's other locations); `GeminiLocationRepository` parses the response into an ordered
+  `List<ResolvedLocation>` rather than a single result
 - **Background processing**: `WorkManager` (`CoroutineWorker`) runs the download -> OCR -> geocode
   pipeline so it survives the app being backgrounded right after a share (the common case, since
   the user was just in Instagram/TikTok); progress is observed via `getWorkInfoByIdFlow` for the
-  in-app animated UI, and a result notification (tap to deep-link straight into Maps) fires
-  regardless of whether the app is still in the foreground (see `ProcessSharedUrlWorker`,
-  `ShareNotifier`, `ShareViewModel`)
+  in-app animated UI, and a result notification (tap to deep-link straight into Maps for the
+  top-ranked match) fires regardless of whether the app is still in the foreground (see
+  `ProcessSharedUrlWorker`, `ShareNotifier`, `ShareViewModel`). `ProcessSharedUrlWorker` also
+  records every terminal outcome to `core:history` (best-effort - a history-write failure never
+  masks the real pipeline result)
 - **Settings persistence**: Jetpack DataStore Preferences (`core:settings`) stores the
   user-entered Gemini API key under the app's `filesDir`, covered by the manifest's existing
   `android:allowBackup="true"` Auto Backup - no separate sync/backup plumbing needed for it to
   carry over to a user's other devices
+- **History persistence**: Jetpack DataStore Preferences (`core:history`), in its own file/qualifier
+  from `core:settings`'/`core:instagramauth`'s stores, holds the last 50 shared links (oldest
+  trimmed on write) as a single JSON-array string - covered by Auto Backup like `core:settings`,
+  since a history list carries no secret material
 - **Testing**: JUnit 4, Mockito-Kotlin, `kotlinx-coroutines-test`
 - **Linting**: ktlint via `org.jlleitschuh.gradle.ktlint`
 - **Coverage**: Kover (`org.jetbrains.kotlinx.kover`)
@@ -156,6 +173,17 @@ exact video the moment a fresh session is saved - see `feature:share`'s `ShareVi
 - Use `UnconfinedTestDispatcher`/`StandardTestDispatcher` (from `kotlinx-coroutines-test`) for
   coroutine-based code. Prefer hand-rolled fakes over Mockito mocks for repository interfaces
   where practical - cheaper to read and keep in sync than a mock's stubbing chain.
+- Any test that round-trips real `org.json` `JSONObject`/`JSONArray` serialization (not just
+  pre-network validation branches) needs a real desktop `org.json:json` jar on the test
+  classpath (`testImplementation(libs.json)`, see `core/history/build.gradle.kts`). Without it,
+  the module compiles against `android.jar`'s non-functional stub `org.json` classes, and under
+  this project's `unitTests.isReturnDefaultValues = true` setting, calling `.toString()` on the
+  stub returns `null` instead of running real logic - the compiler-inserted null-check then
+  throws `NullPointerException: toString(...) must not be null` with no obvious link to the real
+  cause. `feature:share`'s `ResolvedLocationsJson.kt` and `feature:geocoding`'s
+  `GeminiLocationRepository.kt` both use `org.json` for real serialization too, but neither
+  currently has a test exercising that path - add the same `testImplementation(libs.json)` there
+  the moment a test does.
 - The CI coverage job currently reports (uploads the HTML/XML report, posts a job summary)
   rather than blocking merges. Once coverage on the built-out modules is consistently near the
   80% target, promote it to a hard gate with a `kover { reports { verify { rule { minBound(80) }

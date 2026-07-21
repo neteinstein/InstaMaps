@@ -8,34 +8,41 @@ import org.neteinstein.instamaps.core.common.AppError
 import org.neteinstein.instamaps.feature.maps.domain.MapsDestination
 
 private class FakeLocationRepository(
-    private val result: Result<MapsDestination>,
+    private val result: Result<List<ResolvedLocation>>,
 ) : LocationRepository {
     var lastTextReceived: String? = null
 
-    override suspend fun resolveFromText(text: String): Result<MapsDestination> {
+    override suspend fun resolveFromText(text: String): Result<List<ResolvedLocation>> {
         lastTextReceived = text
         return result
     }
 }
 
 class ResolveLocationUseCaseTest {
-    private val sampleDestination = MapsDestination(query = "Eiffel Tower, Paris, France")
+    private val sampleLocations =
+        listOf(
+            ResolvedLocation(
+                name = "Eiffel Tower",
+                address = "Paris, France",
+                destination = MapsDestination(query = "Eiffel Tower, Paris, France"),
+            ),
+        )
 
     @Test
     fun `returns success from repository when text is non-blank`() =
         runTest {
-            val repository = FakeLocationRepository(Result.success(sampleDestination))
+            val repository = FakeLocationRepository(Result.success(sampleLocations))
             val useCase = ResolveLocationUseCase(repository)
 
             val result = useCase("some video text about Eiffel Tower")
 
-            assertEquals(sampleDestination, result.getOrNull())
+            assertEquals(sampleLocations, result.getOrNull())
         }
 
     @Test
     fun `trims whitespace before delegating to repository`() =
         runTest {
-            val repository = FakeLocationRepository(Result.success(sampleDestination))
+            val repository = FakeLocationRepository(Result.success(sampleLocations))
             val useCase = ResolveLocationUseCase(repository)
 
             useCase("   some text   ")
@@ -46,7 +53,7 @@ class ResolveLocationUseCaseTest {
     @Test
     fun `returns InvalidInput error when text is blank`() =
         runTest {
-            val repository = FakeLocationRepository(Result.success(sampleDestination))
+            val repository = FakeLocationRepository(Result.success(sampleLocations))
             val useCase = ResolveLocationUseCase(repository)
 
             val result = useCase("   ")

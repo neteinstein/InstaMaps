@@ -14,7 +14,10 @@ import kotlinx.coroutines.CancellationException
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 import org.neteinstein.instamaps.core.common.AppError
+import org.neteinstein.instamaps.core.history.domain.HistoryLocation
+import org.neteinstein.instamaps.core.history.domain.RecordHistoryEntryUseCase
 import org.neteinstein.instamaps.core.instagramauth.domain.ClearInstagramSessionUseCase
+import org.neteinstein.instamaps.feature.geocoding.domain.ResolvedLocation
 import org.neteinstein.instamaps.feature.share.domain.ProcessSharedUrlUseCase
 import org.neteinstein.instamaps.feature.share.domain.ShareProcessingProgress
 
@@ -34,6 +37,7 @@ class ProcessSharedUrlWorker(
     private val processSharedUrlUseCase: ProcessSharedUrlUseCase by inject()
     private val notifier: ShareNotifier by inject()
     private val clearInstagramSessionUseCase: ClearInstagramSessionUseCase by inject()
+    private val recordHistoryEntryUseCase: RecordHistoryEntryUseCase by inject()
 
     override suspend fun doWork(): Result {
         val url =
@@ -58,6 +62,7 @@ class ProcessSharedUrlWorker(
             // rather than let WorkManager silently mark the job failed with no user-visible signal.
             val message = throwable.message ?: "Something went wrong"
             notifier.notifyFailed(message)
+            recordHistory(url)
             Result.failure(workDataOf(KEY_ERROR_MESSAGE to message))
         }
     }
@@ -67,17 +72,13 @@ class ProcessSharedUrlWorker(
     private suspend fun ShareProcessingProgress.toWorkResult(url: String): Result =
         when (this) {
             is ShareProcessingProgress.Found -> {
-                notifier.notifyFound(destination, displayName)
-                Result.success(
-                    workDataOf(
-                        KEY_MAPS_QUERY to destination.query,
-                        KEY_PLACE_ID to destination.placeId,
-                        KEY_DISPLAY_NAME to displayName,
-                    ),
-                )
+                notifier.notifyFound(locations)
+                recordHistory(url, locations.toHistoryLocations())
+                Result.success(workDataOf(KEY_LOCATIONS_JSON to locations.toJson()))
             }
             is ShareProcessingProgress.NotFound -> {
                 notifier.notifyNotFound(message)
+                recordHistory(url)
                 Result.failure(workDataOf(KEY_ERROR_MESSAGE to message, KEY_NOT_FOUND to true))
             }
             is ShareProcessingProgress.Failed -> Result.failure(error.toFailureWorkData(url))
@@ -86,6 +87,7 @@ class ProcessSharedUrlWorker(
                 // reaching here means it completed without emitting a terminal state.
                 val message = "Processing ended unexpectedly"
                 notifier.notifyFailed(message)
+                recordHistory(url)
                 Result.failure(workDataOf(KEY_ERROR_MESSAGE to message))
             }
         }
@@ -99,6 +101,7 @@ class ProcessSharedUrlWorker(
      */
     private suspend fun Throwable.toFailureWorkData(url: String): Data {
         val message = message ?: "Something went wrong"
+        recordHistory(url)
         return if (this is AppError.AuthenticationRequired) {
             clearInstagramSessionUseCase()
             notifier.notifyFailed(message)
@@ -109,6 +112,25 @@ class ProcessSharedUrlWorker(
         }
     }
 
+    /**
+     * Records every terminal outcome - including failures/not-found, not just successes - so
+     * `feature:history`'s screen reflects every link the user actually shared, matching what
+     * "history" means to them. Deliberately best-effort: a DataStore write failure here (e.g. disk
+     * full) must never mask or fail an otherwise-successful pipeline result.
+     */
+    private suspend fun recordHistory(
+        url: String,
+        locations: List<HistoryLocation> = emptyList(),
+    ) {
+        try {
+            recordHistoryEntryUseCase(url = url, locations = locations)
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (_: Throwable) {
+            // Best-effort, see kdoc above.
+        }
+    }
+
     companion object {
         const val KEY_URL = "url"
         const val KEY_STAGE = "stage"
@@ -116,9 +138,7 @@ class ProcessSharedUrlWorker(
         const val KEY_ERROR_MESSAGE = "error_message"
         const val KEY_NOT_FOUND = "not_found"
         const val KEY_AUTH_REQUIRED = "auth_required"
-        const val KEY_MAPS_QUERY = "maps_query"
-        const val KEY_PLACE_ID = "place_id"
-        const val KEY_DISPLAY_NAME = "display_name"
+        const val KEY_LOCATIONS_JSON = "locations_json"
 
         const val STAGE_CHECKING_DESCRIPTION = "CHECKING_DESCRIPTION"
         const val STAGE_DOWNLOADING = "DOWNLOADING"
@@ -169,3 +189,7 @@ private fun ShareProcessingProgress.toWorkData(): Data =
         is ShareProcessingProgress.Found, is ShareProcessingProgress.NotFound, is ShareProcessingProgress.Failed ->
             workDataOf()
     }
+
+/** `core:history` never depends on `feature:geocoding`, so this mapping only lives here. */
+private fun List<ResolvedLocation>.toHistoryLocations(): List<HistoryLocation> =
+    map { location -> HistoryLocation(name = location.name, address = location.address) }
