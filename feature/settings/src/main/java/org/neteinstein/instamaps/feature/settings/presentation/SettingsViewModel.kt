@@ -91,7 +91,10 @@ class SettingsViewModel(
      * installer - unless [AppUpdateInstaller.canInstallPackages] says the OS will block that
      * install outright, in which case this stops at [UpdateStatus.SideloadingBlocked] without
      * downloading anything (no point spending the bandwidth on an APK the system won't let
-     * through).
+     * through). [UpdateStatus.Checking] and [UpdateStatus.Downloading] both keep the screen from
+     * timing out for as long as they're the current status - see `SettingsScreen`'s
+     * `KeepScreenOnWhile` - since this whole flow runs on a plain `viewModelScope` coroutine, not
+     * a `WorkManager` job that would survive the app leaving the foreground.
      */
     fun onUpdateClicked() {
         viewModelScope.launch {
@@ -126,8 +129,12 @@ class SettingsViewModel(
         _uiState.value = _uiState.value.copy(updateStatus = UpdateStatus.Downloading)
         downloadAppUpdateUseCase(update)
             .onSuccess { apkFile ->
-                _uiState.value = _uiState.value.copy(updateStatus = UpdateStatus.Idle)
+                // Fire the installer intent while updateStatus is still Downloading (not Idle)
+                // so SettingsScreen's keep-screen-on effect - tied to Checking/Downloading - is
+                // still active for this exact call: that intent is a foreground-only activity
+                // start, silently dropped by the OS if the screen has already locked by now.
                 appUpdateInstaller.installPackage(apkFile)
+                _uiState.value = _uiState.value.copy(updateStatus = UpdateStatus.Idle)
             }.onFailure { error ->
                 _uiState.value = _uiState.value.copy(updateStatus = UpdateStatus.Failed(error.toUserMessage()))
             }

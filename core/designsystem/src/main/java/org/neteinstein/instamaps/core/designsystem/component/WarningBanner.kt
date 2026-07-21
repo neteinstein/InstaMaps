@@ -32,16 +32,19 @@ enum class BannerTone {
 }
 
 /**
- * A readiness nudge paired with a single action button that resolves it (open Settings, connect
- * Instagram, ...). [tone] drives both the color scheme and the icon - see [BannerTone].
+ * A readiness nudge, optionally paired with a single action button that resolves it (open
+ * Settings, connect Instagram, ...). [tone] drives both the color scheme and the icon - see
+ * [BannerTone]. [actionLabel]/[onActionClick] are both optional and only meaningful together -
+ * omit both for a purely informational banner with nothing to resolve (see `feature:share`'s
+ * processing-screen background hint, which has no action beyond reading the message).
  */
 @Composable
 fun WarningBanner(
     message: String,
-    actionLabel: String,
-    onActionClick: () -> Unit,
     modifier: Modifier = Modifier,
     tone: BannerTone = BannerTone.WARNING,
+    actionLabel: String? = null,
+    onActionClick: (() -> Unit)? = null,
 ) {
     val containerColor: Color
     val contentColor: Color
@@ -77,11 +80,13 @@ fun WarningBanner(
                     modifier = Modifier.padding(start = 12.dp),
                 )
             }
-            TextButton(
-                onClick = onActionClick,
-                modifier = Modifier.align(Alignment.End),
-            ) {
-                Text(text = actionLabel)
+            if (actionLabel != null && onActionClick != null) {
+                TextButton(
+                    onClick = onActionClick,
+                    modifier = Modifier.align(Alignment.End),
+                ) {
+                    Text(text = actionLabel)
+                }
             }
         }
     }
