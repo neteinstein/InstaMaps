@@ -6,6 +6,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Test
+import org.neteinstein.instamaps.core.common.AppError
 
 private class FakeAppSettingsRepository(
     initial: String? = null,
@@ -81,5 +82,42 @@ class IsGeminiApiKeyConfiguredUseCaseTest {
             useCase().test {
                 assertEquals(false, awaitItem())
             }
+        }
+}
+
+private class FakeGeminiApiKeyValidator(
+    private val result: Result<ApiKeyValidity>,
+) : GeminiApiKeyValidator {
+    var lastValidatedKey: String? = null
+
+    override suspend fun validate(apiKey: String): Result<ApiKeyValidity> {
+        lastValidatedKey = apiKey
+        return result
+    }
+}
+
+class ValidateGeminiApiKeyUseCaseTest {
+    @Test
+    fun `delegates to the validator and returns its result`() =
+        runTest {
+            val validator = FakeGeminiApiKeyValidator(result = Result.success(ApiKeyValidity.VALID))
+            val useCase = ValidateGeminiApiKeyUseCase(validator)
+
+            val result = useCase("AIzaSyExample")
+
+            assertEquals("AIzaSyExample", validator.lastValidatedKey)
+            assertEquals(ApiKeyValidity.VALID, result.getOrNull())
+        }
+
+    @Test
+    fun `propagates a failure when validity could not be determined`() =
+        runTest {
+            val failure = Result.failure<ApiKeyValidity>(AppError.Network("no network"))
+            val validator = FakeGeminiApiKeyValidator(result = failure)
+            val useCase = ValidateGeminiApiKeyUseCase(validator)
+
+            val result = useCase("AIzaSyExample")
+
+            assertEquals(true, result.isFailure)
         }
 }

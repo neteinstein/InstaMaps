@@ -79,7 +79,9 @@ free API key:
 4. Copy the generated key (starts with `AIza...`).
 5. In InstaMaps, open Settings - reachable from the top right of the main screen, or straight from
    the onboarding screen if you haven't added a key yet - paste the key into the Gemini API Key
-   field, and tap Save.
+   field, and tap Save (enabled once you've actually changed the field). Save checks the key
+   against Gemini and turns green if it works or red if it doesn't - either way the key is saved,
+   so red is just a heads-up to double-check it, not a rejection.
 
 Keep the key private - anyone with it can make Gemini API calls billed to your project. InstaMaps
 stores it on-device only (Jetpack DataStore) and never sends it anywhere except directly to

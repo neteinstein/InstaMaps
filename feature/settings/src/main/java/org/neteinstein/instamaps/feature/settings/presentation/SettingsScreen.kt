@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
@@ -33,12 +32,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.koin.androidx.compose.koinViewModel
+import org.neteinstein.instamaps.core.designsystem.component.ButtonTone
 import org.neteinstein.instamaps.core.designsystem.component.PrimaryButton
 import org.neteinstein.instamaps.core.designsystem.theme.MapsGreen
 import org.neteinstein.instamaps.core.permissions.RuntimePermissionState
@@ -72,12 +73,16 @@ fun SettingsRoute(
 }
 
 /**
- * Stateless, preview/test-friendly screen: title bar up top, a scrollable body (the API key field
- * plus a live [permissionStates] status list), and the Save button pinned to the bottom of the
- * screen via [Scaffold]'s `bottomBar` - not just the bottom of the scrolling column - so it stays
- * put regardless of field/list content length. The bottom bar carries `imePadding()` so it rises
- * clear of the on-screen keyboard instead of being covered by it while the API key field is
- * focused.
+ * Stateless, preview/test-friendly screen: title bar up top, a scrollable body with the API key
+ * field and the Save button side by side in one row (rather than a separate `bottomBar`, since
+ * the action is now local to the field it acts on), followed by a live [permissionStates] status
+ * list. Save is only enabled once [SettingsUiState.hasUnsavedChanges] is true - i.e. the field's
+ * text differs from the last known-persisted value - so there's nothing to tap until the user
+ * actually edits the key. Tapping it always persists the key, then checks it against the real
+ * Gemini API: the button shows a spinner while that check is in flight
+ * ([ApiKeyValidationStatus.VALIDATING]) and settles into green/red
+ * ([ApiKeyValidationStatus.VALID]/[ApiKeyValidationStatus.INVALID]) once it resolves - see
+ * [SettingsViewModel.onSaveClicked].
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -104,11 +109,6 @@ fun SettingsScreen(
                 },
             )
         },
-        bottomBar = {
-            Column(modifier = Modifier.fillMaxWidth().imePadding().padding(16.dp)) {
-                PrimaryButton(text = stringResource(R.string.settings_save), onClick = onSaveClicked)
-            }
-        },
     ) { contentPadding ->
         Column(
             modifier =
@@ -118,24 +118,34 @@ fun SettingsScreen(
                     .verticalScroll(rememberScrollState())
                     .padding(16.dp),
         ) {
-            OutlinedTextField(
-                value = uiState.apiKeyInput,
-                onValueChange = onApiKeyChanged,
+            Row(
                 modifier = Modifier.fillMaxWidth(),
-                label = { Text(text = stringResource(R.string.settings_api_key_label)) },
-                supportingText = {
-                    Text(
-                        text =
-                            if (uiState.justSaved) {
-                                stringResource(R.string.settings_saved_confirmation)
-                            } else {
-                                stringResource(R.string.settings_api_key_supporting_text)
-                            },
-                    )
-                },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None, imeAction = ImeAction.Done),
-            )
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                OutlinedTextField(
+                    value = uiState.apiKeyInput,
+                    onValueChange = onApiKeyChanged,
+                    modifier = Modifier.weight(1f),
+                    label = { Text(text = stringResource(R.string.settings_api_key_label)) },
+                    supportingText = {
+                        Text(
+                            text = apiKeySupportingText(uiState.validationStatus),
+                            color = apiKeySupportingTextColor(uiState.validationStatus),
+                        )
+                    },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None, imeAction = ImeAction.Done),
+                )
+                PrimaryButton(
+                    text = stringResource(R.string.settings_save),
+                    onClick = onSaveClicked,
+                    enabled = uiState.hasUnsavedChanges,
+                    fillWidth = false,
+                    loading = uiState.validationStatus == ApiKeyValidationStatus.VALIDATING,
+                    tone = apiKeySaveButtonTone(uiState.validationStatus),
+                )
+            }
 
             if (permissionStates.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(24.dp))
@@ -153,6 +163,32 @@ fun SettingsScreen(
         }
     }
 }
+
+@Composable
+private fun apiKeySupportingText(validationStatus: ApiKeyValidationStatus): String =
+    when (validationStatus) {
+        ApiKeyValidationStatus.IDLE -> stringResource(R.string.settings_api_key_supporting_text)
+        ApiKeyValidationStatus.VALIDATING -> stringResource(R.string.settings_api_key_validating)
+        ApiKeyValidationStatus.VALID -> stringResource(R.string.settings_api_key_valid)
+        ApiKeyValidationStatus.INVALID -> stringResource(R.string.settings_api_key_invalid)
+        ApiKeyValidationStatus.UNKNOWN -> stringResource(R.string.settings_api_key_validation_unknown)
+    }
+
+/** [Color.Unspecified] keeps [OutlinedTextField]'s own default supporting-text color. */
+@Composable
+private fun apiKeySupportingTextColor(validationStatus: ApiKeyValidationStatus): Color =
+    when (validationStatus) {
+        ApiKeyValidationStatus.VALID -> MapsGreen
+        ApiKeyValidationStatus.INVALID -> MaterialTheme.colorScheme.error
+        else -> Color.Unspecified
+    }
+
+private fun apiKeySaveButtonTone(validationStatus: ApiKeyValidationStatus): ButtonTone =
+    when (validationStatus) {
+        ApiKeyValidationStatus.VALID -> ButtonTone.SUCCESS
+        ApiKeyValidationStatus.INVALID -> ButtonTone.ERROR
+        ApiKeyValidationStatus.IDLE, ApiKeyValidationStatus.VALIDATING, ApiKeyValidationStatus.UNKNOWN -> ButtonTone.DEFAULT
+    }
 
 /**
  * One permission: its name, live status pill, and - only while unresolved - a small action that
