@@ -57,10 +57,23 @@ import org.neteinstein.instamaps.feature.share.work.ShareDeepLink
  * or the system back gesture/button. Settings/History/Instagram-login stay reachable regardless of
  * readiness - [PermissionsScreen]'s "Add API key" CTA needs to reach Settings even before the app
  * is ready.
+ *
+ * Also bridges [org.neteinstein.instamaps.feature.settings.presentation.SettingsRoute]'s "Test a
+ * link" field into the same pipeline a real OS share uses: `feature:settings` has no dependency on
+ * `feature:share` (feature modules never depend on each other directly), so [SettingsRoute]'s
+ * `onTestLink` callback is supplied here, feeding the submitted URL through [submitSharedText] -
+ * the exact same path [onNewIntent] uses for a repeat share - and flipping [Screen] back to
+ * [Screen.SHARE] so the result is visible immediately.
  */
 class MainActivity : ComponentActivity() {
     private val mapsLauncher: MapsLauncher by inject()
     private var sharedText by mutableStateOf<String?>(null)
+
+    // Bumped every time sharedText is (re)submitted, real share or "Test a link" alike. Compose's
+    // LaunchedEffect(sharedText) in ShareRoute wouldn't restart on two structurally-equal URLs in
+    // a row - see ShareRoute's sharedTextRequestId param - so this nonce is what actually forces a
+    // retrigger.
+    private var sharedTextRequestId by mutableStateOf(0L)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -71,7 +84,7 @@ class MainActivity : ComponentActivity() {
             return
         }
 
-        sharedText = intent.extractSharedText()
+        submitSharedText(intent.extractSharedText())
 
         setContent {
             InstaMapsTheme {
@@ -79,7 +92,14 @@ class MainActivity : ComponentActivity() {
                 BackHandler(enabled = screen != Screen.SHARE) { screen = Screen.SHARE }
 
                 when (screen) {
-                    Screen.SETTINGS -> SettingsRoute(onBack = { screen = Screen.SHARE })
+                    Screen.SETTINGS ->
+                        SettingsRoute(
+                            onBack = { screen = Screen.SHARE },
+                            onTestLink = { url ->
+                                submitSharedText(url)
+                                screen = Screen.SHARE
+                            },
+                        )
                     Screen.HISTORY -> HistoryRoute(onBack = { screen = Screen.SHARE })
                     Screen.INSTAGRAM_LOGIN ->
                         InstagramLoginRoute(
@@ -91,6 +111,7 @@ class MainActivity : ComponentActivity() {
                         if (readiness.isReady) {
                             ShareRoute(
                                 sharedText = sharedText,
+                                sharedTextRequestId = sharedTextRequestId,
                                 onOpenSettings = { screen = Screen.SETTINGS },
                                 onOpenHistory = { screen = Screen.HISTORY },
                                 onNeedsInstagramLogin = { screen = Screen.INSTAGRAM_LOGIN },
@@ -116,7 +137,12 @@ class MainActivity : ComponentActivity() {
             return
         }
 
-        sharedText = intent.extractSharedText()
+        submitSharedText(intent.extractSharedText())
+    }
+
+    private fun submitSharedText(text: String?) {
+        sharedText = text
+        sharedTextRequestId++
     }
 
     private fun tryHandleMapsDeepLink(intent: Intent): Boolean {

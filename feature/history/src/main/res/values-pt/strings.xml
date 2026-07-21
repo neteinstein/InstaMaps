@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="history_title">Histórico</string>
+    <string name="history_back">Voltar</string>
+    <string name="history_empty">Ainda não há nada aqui. Compartilhe um vídeo do Instagram ou TikTok para começar.</string>
+    <string name="history_open_video">Abrir vídeo</string>
+    <string name="history_open_maps">Abrir no Google Maps</string>
+    <string name="history_no_location_found">Nenhum local encontrado</string>
+    <string name="history_more_locations">+%1$d mais</string>
+</resources>

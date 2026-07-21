@@ -1,6 +1,10 @@
 package org.neteinstein.instamaps.feature.settings.presentation
 
 import android.Manifest
+import android.content.Intent
+import android.net.Uri
+import android.os.Build
+import android.provider.Settings
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -32,9 +36,13 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
@@ -57,15 +65,43 @@ import org.neteinstein.instamaps.feature.settings.R
  * status (see [rememberRuntimePermissionState]) is collected here rather than through
  * [SettingsUiState] - it's read straight from the Android system/Activity, not from a repository
  * the ViewModel could observe, so it has no business living in the ViewModel's state.
+ *
+ * The "Test a link" field's text is plain [rememberSaveable] state, not [SettingsViewModel] state
+ * like the API key field - it's never persisted or validated against a backend, it only ever
+ * needs to survive this screen's own recompositions/config changes, so routing it through the
+ * ViewModel would add a layer of indirection for no benefit. Submitting it calls [onTestLink] -
+ * supplied by `MainActivity`, which feeds it into the exact same `sharedText` mechanism a real
+ * OS share already uses - rather than reaching into `feature:share` directly: feature modules
+ * never depend on each other directly, see `agents.md`.
+ *
+ * [onChangeLanguageClicked] is `null` below API 33 - there is no system per-app-language screen
+ * to deep-link into on older versions (see [requiredRuntimePermissions] for the same
+ * SDK-int-gating convention) - so [SettingsScreen] hides the whole Language section in that case.
  */
 @Composable
 fun SettingsRoute(
     onBack: () -> Unit,
+    onTestLink: (String) -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: SettingsViewModel = koinViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val permissionStates = requiredRuntimePermissions().map { rememberRuntimePermissionState(it) }
+    var testLinkInput by rememberSaveable { mutableStateOf("") }
+    val context = LocalContext.current
+    val onChangeLanguageClicked: (() -> Unit)? =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            {
+                context.startActivity(
+                    Intent(Settings.ACTION_APP_LOCALE_SETTINGS).apply {
+                        data = Uri.fromParts("package", context.packageName, null)
+                    },
+                )
+            }
+        } else {
+            null
+        }
+
     SettingsScreen(
         uiState = uiState,
         permissionStates = permissionStates,
@@ -74,21 +110,33 @@ fun SettingsRoute(
         onUpdateClicked = viewModel::onUpdateClicked,
         onEnableSideloadingClicked = viewModel::onEnableSideloadingClicked,
         onBack = onBack,
+        testLinkInput = testLinkInput,
+        onTestLinkInputChanged = { testLinkInput = it },
+        onTestLinkSubmitted = { onTestLink(testLinkInput.trim()) },
+        onChangeLanguageClicked = onChangeLanguageClicked,
         modifier = modifier,
     )
 }
 
 /**
- * Stateless, preview/test-friendly screen: title bar up top, a scrollable body with the API key
- * field and the Save button side by side in one row (rather than a separate `bottomBar`, since
- * the action is now local to the field it acts on), followed by a live [permissionStates] status
- * list. Save is only enabled once [SettingsUiState.hasUnsavedChanges] is true - i.e. the field's
- * text differs from the last known-persisted value - so there's nothing to tap until the user
- * actually edits the key. Tapping it always persists the key, then checks it against the real
- * Gemini API: the button shows a spinner while that check is in flight
- * ([ApiKeyValidationStatus.VALIDATING]) and settles into green/red
- * ([ApiKeyValidationStatus.VALID]/[ApiKeyValidationStatus.INVALID]) once it resolves - see
- * [SettingsViewModel.onSaveClicked].
+ * Stateless, preview/test-friendly screen: title bar up top, a scrollable body ordered
+ * Language -> API key -> Test a link -> Permissions -> Updates. Language leads the screen -
+ * ahead of even the API key field - since it's a device-wide preference a user is likely to look
+ * for immediately, not something tied to getting InstaMaps working; it's omitted entirely when
+ * [onChangeLanguageClicked] is `null` (below API 33 - see [SettingsRoute]).
+ *
+ * The API key field and Save button sit side by side in one row (rather than a separate
+ * `bottomBar`, since the action is now local to the field it acts on). Save is only enabled once
+ * [SettingsUiState.hasUnsavedChanges] is true - i.e. the field's text differs from the last
+ * known-persisted value - so there's nothing to tap until the user actually edits the key. Tapping
+ * it always persists the key, then checks it against the real Gemini API: the button shows a
+ * spinner while that check is in flight ([ApiKeyValidationStatus.VALIDATING]) and settles into
+ * green/red ([ApiKeyValidationStatus.VALID]/[ApiKeyValidationStatus.INVALID]) once it resolves -
+ * see [SettingsViewModel.onSaveClicked].
+ *
+ * The "Test a link" section only appears once [SettingsUiState.savedApiKey] is non-blank - running
+ * the pipeline without a key would just fail at the Gemini call, so there's nothing useful to test
+ * before then. [onTestLinkSubmitted] is disabled for a blank/whitespace-only [testLinkInput].
  *
  * The permissions section only lists permissions still needing action - a permission already
  * [RuntimePermissionStatus.GRANTED] has nothing to resolve and nothing worth showing here - and
@@ -106,6 +154,10 @@ fun SettingsScreen(
     permissionStates: List<RuntimePermissionState> = emptyList(),
     onUpdateClicked: () -> Unit = {},
     onEnableSideloadingClicked: () -> Unit = {},
+    testLinkInput: String = "",
+    onTestLinkInputChanged: (String) -> Unit = {},
+    onTestLinkSubmitted: () -> Unit = {},
+    onChangeLanguageClicked: (() -> Unit)? = null,
 ) {
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -131,6 +183,19 @@ fun SettingsScreen(
                     .verticalScroll(rememberScrollState())
                     .padding(16.dp),
         ) {
+            // Deliberately the first thing on the screen, ahead of even the API key field -
+            // language is a device-wide preference the user is likeliest to look for right away,
+            // not something tied to getting InstaMaps working.
+            if (onChangeLanguageClicked != null) {
+                Text(
+                    text = stringResource(R.string.settings_language_section_title),
+                    style = MaterialTheme.typography.titleMedium,
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                LanguageSection(onChangeLanguageClicked = onChangeLanguageClicked)
+                Spacer(modifier = Modifier.height(24.dp))
+            }
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -157,6 +222,20 @@ fun SettingsScreen(
                     fillWidth = false,
                     loading = uiState.validationStatus == ApiKeyValidationStatus.VALIDATING,
                     tone = apiKeySaveButtonTone(uiState.validationStatus),
+                )
+            }
+
+            if (uiState.savedApiKey.isNotBlank()) {
+                Spacer(modifier = Modifier.height(24.dp))
+                Text(
+                    text = stringResource(R.string.settings_test_link_section_title),
+                    style = MaterialTheme.typography.titleMedium,
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                TestLinkSection(
+                    value = testLinkInput,
+                    onValueChanged = onTestLinkInputChanged,
+                    onSubmit = onTestLinkSubmitted,
                 )
             }
 
@@ -187,6 +266,72 @@ fun SettingsScreen(
                 onEnableSideloadingClicked = onEnableSideloadingClicked,
             )
         }
+    }
+}
+
+/**
+ * Text field + submit button for running a link through the pipeline without sharing it from
+ * Instagram/TikTok - see [SettingsRoute]. [onSubmit] is wired to a button disabled for a blank
+ * [value], and the field is intentionally single-line/URL-shaped rather than validated here: any
+ * text that doesn't actually contain a recognizable video link surfaces its own error once
+ * processing starts, the same way an unparseable real share does (see
+ * `feature:share`'s `ParseSharedTextUseCase`).
+ */
+@Composable
+private fun TestLinkSection(
+    value: String,
+    onValueChanged: (String) -> Unit,
+    onSubmit: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            OutlinedTextField(
+                value = value,
+                onValueChange = onValueChanged,
+                modifier = Modifier.weight(1f),
+                label = { Text(text = stringResource(R.string.settings_test_link_label)) },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None, imeAction = ImeAction.Done),
+            )
+            PrimaryButton(
+                text = stringResource(R.string.settings_test_link_button),
+                onClick = onSubmit,
+                enabled = value.isNotBlank(),
+                fillWidth = false,
+            )
+        }
+        Text(
+            text = stringResource(R.string.settings_test_link_supporting_text),
+            style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.padding(top = 8.dp),
+        )
+    }
+}
+
+/**
+ * Info text + button deep-linking into the system per-app language screen (see [SettingsRoute]) -
+ * same info-text-then-button shape as [UpdateSection].
+ */
+@Composable
+private fun LanguageSection(
+    onChangeLanguageClicked: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier.fillMaxWidth()) {
+        Text(
+            text = stringResource(R.string.settings_language_info),
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.padding(bottom = 8.dp),
+        )
+        PrimaryButton(
+            text = stringResource(R.string.settings_language_button),
+            onClick = onChangeLanguageClicked,
+        )
     }
 }
 

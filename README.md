@@ -175,6 +175,23 @@ a warning instead of downloading anything, with a button that jumps straight to 
 page in system Settings - grant it there, come back, and press **Update to latest** again to
 continue.
 
+Once the update finishes installing, InstaMaps automatically deletes the downloaded APK from its
+cache - there's nothing left behind to manually clear out afterward.
+
+### Testing a link without sharing
+
+Settings also has a **Test a link** field, right below the Gemini API key (it only shows up once
+a key is saved). Paste an Instagram or TikTok link into it and tap **Test** to run it through the
+exact same pipeline as a real share - handy for trying InstaMaps out, or checking that a new API
+key/permission actually works, without switching back to Instagram or TikTok first.
+
+### Language
+
+InstaMaps ships in English and Portuguese. A **Language** section at the very top of Settings
+links straight to Android's per-app language picker (Android 13+) so you can run InstaMaps in
+either language regardless of your device's own system language. On older Android versions,
+InstaMaps simply follows your device's language like any other app.
+
 ## Architecture
 
 Kotlin, Jetpack Compose, MVVM, Coroutines, Koin DI, one Gradle module per feature, Clean

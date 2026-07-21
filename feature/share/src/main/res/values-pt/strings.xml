@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="share_notification_channel_name">Processamento de localização</string>
+    <string name="share_notification_processing_title">Procurando o local…</string>
+    <string name="share_notification_found_title">Local encontrado!</string>
+    <string name="share_notification_found_multiple_text">%1$s (+%2$d mais encontrados - abra o app para ver todos)</string>
+    <string name="share_notification_not_found_title">Nenhum local encontrado</string>
+    <string name="share_notification_failed_title">Algo deu errado</string>
+
+    <string name="share_idle_title">Compartilhe um vídeo para encontrar o local</string>
+    <string name="share_idle_subtitle">Compartilhe um vídeo do Instagram ou TikTok com o InstaMaps e encontraremos onde foi filmado.</string>
+
+    <string name="share_stage_checking_description">Verificando a legenda…</string>
+    <string name="share_stage_downloading">Baixando vídeo…</string>
+    <string name="share_stage_extracting_frames">Extraindo quadros…</string>
+    <string name="share_stage_analyzing_frame">Lendo o texto na tela…</string>
+    <string name="share_stage_geocoding">Procurando o local…</string>
+    <string name="share_processing_background_hint">Você pode deixar esta tela ou voltar ao app - o InstaMaps continua trabalhando em segundo plano e vai te avisar assim que encontrar o local.</string>
+
+    <string name="share_found_open_maps">Abrir no Google Maps</string>
+    <string name="share_found_title">Local encontrado!</string>
+    <string name="share_found_multiple_title">%1$d locais encontrados!</string>
+    <string name="share_found_multiple_subtitle">Toque no local que você procura para abri-lo no Google Maps.</string>
+    <string name="share_not_found_title">Nenhum local encontrado</string>
+    <string name="share_error_title">Algo deu errado</string>
+    <string name="share_retry_button">Tentar novamente</string>
+
+    <string name="share_settings_button">Configurações</string>
+    <string name="share_history_button">Histórico</string>
+    <string name="share_warning_instagram_not_connected">Conecte sua conta do Instagram para melhorar as chances de baixar um vídeo compartilhado.</string>
+    <string name="share_warning_connect_instagram">Conectar Instagram</string>
+
+    <string name="share_auth_required_title">Login do Instagram necessário</string>
+    <string name="share_auth_required_login">Fazer login no Instagram</string>
+    <string name="share_auth_required_dismiss">Agora não</string>
+
+    <!-- Rotating "what it's doing" flavor lines shown under the stage label while processing,
+         cycled every FLAVOR_LINE_INTERVAL_MS in ShareScreen's FlavorLine composable. -->
+    <string-array name="share_flavor_lines_checking_description">
+        <item>Procurando pistas na legenda…</item>
+        <item>Verificando se quem postou já deu a dica…</item>
+    </string-array>
+    <string-array name="share_flavor_lines_downloading">
+        <item>Baixando o vídeo…</item>
+        <item>Reduzindo para o menor tamanho que ainda fica nítido…</item>
+        <item>Quase lá…</item>
+    </string-array>
+    <string-array name="share_flavor_lines_extracting_frames">
+        <item>Dividindo o vídeo em quadros…</item>
+        <item>Capturando os quadros-chave…</item>
+        <item>Escolhendo os quadros que valem uma olhada mais atenta…</item>
+    </string-array>
+    <string-array name="share_flavor_lines_analyzing_frame">
+        <item>Lendo cada placa, cardápio e legenda à vista…</item>
+        <item>Analisando o texto na tela…</item>
+        <item>Ensinando os pixels a ler…</item>
+    </string-array>
+    <string-array name="share_flavor_lines_geocoding">
+        <item>Perguntando ao Gemini onde no mundo isso fica…</item>
+        <item>Classificando os principais suspeitos…</item>
+        <item>Cruzando nomes e endereços…</item>
+    </string-array>
+</resources>

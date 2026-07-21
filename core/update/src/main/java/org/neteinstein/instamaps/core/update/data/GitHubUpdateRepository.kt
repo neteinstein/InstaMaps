@@ -47,7 +47,7 @@ class GitHubUpdateRepository(
     override suspend fun downloadUpdate(update: AppUpdate): Result<File> =
         withContext(dispatcherProvider.io) {
             safeCall(mapError = ::toAppError) {
-                val updatesDir = File(context.cacheDir, UPDATE_CACHE_DIR_NAME)
+                val updatesDir = updatesDir()
                 // Only one downloaded update is ever "current" - clear out anything left over from
                 // a previous check before writing the new one, rather than letting stale APKs
                 // accumulate in the cache dir forever (nothing else in the app ever revisits them).
@@ -59,6 +59,16 @@ class GitHubUpdateRepository(
                 apkFile
             }
         }
+
+    override suspend fun clearDownloadedUpdate(): Result<Unit> =
+        withContext(dispatcherProvider.io) {
+            safeCall(mapError = ::toAppError) {
+                updatesDir().deleteRecursively()
+                Unit
+            }
+        }
+
+    private fun updatesDir(): File = File(context.cacheDir, UPDATE_CACHE_DIR_NAME)
 
     // getPackageInfo(String, Int) is deprecated in favor of the PackageInfoFlags overload added in
     // API 33, but minSdk is 27 - there's no non-deprecated way to read this below API 33.
